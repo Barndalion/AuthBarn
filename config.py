@@ -13,7 +13,6 @@ PERMISSION_FILE = os.path.join(USERDATA_DIR,"permission.json")
 USERDATA_FILE = os.path.join(USERDATA_DIR,"userdata.json")
 GENERAL_INFO_FILE = os.path.join(LOG_DIR,"general_logs.log")
 USERS_LOG_FILE = os.path.join(LOG_DIR,"user_logs.log")
-ADMIN_LOG_FILE = os.path.join(LOG_DIR,"admin_logs.log")
 #function to test if files exist at path
 def ensure_json_exist(filepath,default_data):
     if not os.path.exists(filepath):
@@ -21,4 +20,4 @@ def ensure_json_exist(filepath,default_data):
             json.dump(default_data, f,indent=4)
 
 ensure_json_exist(USERDATA_FILE,{})
-ensure_json_exist(PERMISSION_FILE,{"admin":[],"User":[]})
+ensure_json_exist(PERMISSION_FILE,{"Admin":[],"User":[]})
