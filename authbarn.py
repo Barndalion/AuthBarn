@@ -76,7 +76,19 @@ class Authentication():
         Action._dev_mode = False
         self.username = name
         self.password = new_password 
-        self.log("info", f"{name} Successfully Registered!!")  
+        self.log("info", f"{name} Successfully Registered!!") 
+
+    def reset_password(self,username,new_password):
+        if username not in userdata:
+            user_logger.warning("Username Not Found")
+            raise NotFound(f"Username {username} Not Found")
+        if new_password == userdata[username][0]:
+            user_logger.warning("New Password Cant Be The Same As Old Password")
+            raise AlreadyExist("New Password Cant Be The Same As Old Password")
+        new_password = self.hashed_password(new_password)
+        userdata[username][0] = new_password
+        user_logger.info("Successfully Reset Password!!")
+        Action.save_json(USERDATA_FILE,userdata)
 
 class Action(Authentication):
     _dev_mode = False
@@ -202,7 +214,7 @@ class Action(Authentication):
                         self.save_json(PERMISSION_FILE, defined_permissions)
                         self.log("info", f"Permission '{permname}' added to role '{add_to}'.")
             else:
-                self.log("warning", f"{add_to}is not a defined role")
+                self.log("warning", f"{add_to} is not a defined role")
             
     def execute(self,permission_name):
         if not Action._dev_mode:
@@ -219,6 +231,7 @@ class Action(Authentication):
         else:
             raise NotFound(f"No Function Saved As {permission_name}")
 instance = Action()
+instance.add_user("Darell","1234","Admin")
 instance.set_dev_mode(True)
 def hello():
     print("Hello World")

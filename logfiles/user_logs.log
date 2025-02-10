@@ -1,0 +1,8 @@
+2025-02-10 10:14:27,209 - INFO - Successfully Added hello as a custom permission
+2025-02-10 10:14:27,209 - WARNING - Adminis not a defined role
+2025-02-10 10:18:22,507 - INFO - Permission Not Allowed For Admin
+2025-02-10 10:18:22,582 - INFO - Successfully Added hello as a custom permission
+2025-02-10 10:18:22,582 - WARNING - Admin is not a defined role
+2025-02-10 10:18:39,488 - INFO - Permission Not Allowed For Admin
+2025-02-10 10:18:39,571 - INFO - Successfully Added hello as a custom permission
+2025-02-10 10:18:39,571 - INFO - Permission 'hello' added to role 'Admin'.
