@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "authbarn"
+version = "0.1.0"
+authors = [
+    { name="Darell Barnes", email="your_email@example.com" }
+]
+description = "User authentication and role-based management."
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "MIT" }
+dependencies = []
