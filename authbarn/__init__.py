@@ -1,1 +1,1 @@
-from authbarn import *
+from .AuthBarn import *
