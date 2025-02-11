@@ -1,95 +1,168 @@
-Module Name: AuthBarn
-Creator: Darell Barnes
-Version: 1.0.0
+# AuthBarn
 
-Description: A lightweight Python authentication system with user management and role-based permissions,
-designed for standalone use or integration into larger applications.
+## Creator: Darell Barnes  
+## Version: 1.0.0
 
-NB/ in this document several terms are used often. 
-    Permission: These are functions that are executable, the methods within this module are considered permissions
-    and the user can define custom permisions by binding it to a role
+### Description
+AuthBarn is a lightweight Python authentication system with user management and role-based permissions. It is designed for standalone use or integration into larger applications.
 
-    Roles: These are the roles defined in the system like Admin, User or a custom one you make(the user), they
-    encompass the Permissions for avaikabke for a user with the role
+---
 
-    user: this is you, the installer of this script
+## **Terminology**
+Several key terms are used frequently in this document:
 
-    external user: the persons who use YOUR script once this module is integrated
+- **Permission**: Executable functions within the module. Users can define custom permissions by binding functions to roles.
+- **Roles**: Defined system roles (e.g., Admin, User, or a custom role). Roles determine the available permissions for a user.
+- **User**: The individual installing and managing this module.
+- **External User**: The individuals using your script once this module is integrated.
 
-FEATURES
+---
 
-Logging: There are 2 log files the general logs and user logs. The General log tracks all actions done with the modeule,
-and the user log tracks actions done by the user. user of this module can log custom acions/messages within the user
-log file. logging is able to be enabled and disabled
+## **Features**
 
-Hashing: The Module uses Haslib's PBKDF2-HMAC to securely store user passwords as a random hex string
+- **Logging**: Maintains two log files—general logs (tracks all module actions) and user logs (tracks user actions). Users can log custom actions/messages. Logging can be enabled or disabled.
+- **Hashing**: Utilizes `hashlib`'s PBKDF2-HMAC to securely store user passwords as random hex strings.
+- **Permission Management**: Allows adding/removing roles, adding/removing permissions, and executing custom functions.
+- **Developer Mode**: Grants full access to all methods/functions. It is recommended to disable this mode when managing external users.
 
-Permission Management: user is able to add roles, remove role, add permissions, remove permissions and execute custom functions
+---
 
-Developer Mode: once enabled user has access to all methods/functions. best to disable if you plan to manage external
-users of your script with this modeule
+## **Installation**
+```python
+pip install authbarn
+```
+## **Configuration Settings**
+to set up logging mode import authentication from authbarn then set logging to true
+```python
+from authbarn import Authentication
+instance2 = Authentication(enable_logging = True)
+instance2 = Authentication(enable_logging = False)
+```
 
-INSTALLATION
-##
-
-USAGE GUIDE
-importing:
-
+```python
 from AuthBarn import Action
 instance = Action()
+```
 
-*Developer Mode:* 
-**developer mode allows you the user to access all methods without having to authenticate via login or register, if developer mod is not enabled you will be unable to use any of the functions its good practice to enable it at the top of your script then disable it once finiched with your script(this is assuming you try to debug while running the program otherwise only Admins can access the methods)**
-*enabling dveloper mode*
-instance.set_dev_mode(True)
+---
 
-*Register:*
-**Used to Add new users by default the role assigned when register is used is "User"**
-instance.register(username,password)
+## **Usage Guide**
 
-*Login:*
-**This authenticates external user credentials which are auto saved to a json file**
-instance.login(username,password)
+### **Developer Mode**
+Developer mode allows unrestricted access to all methods without requiring authentication. It should be enabled only during debugging and disabled afterward.
 
-*Add User:*
-**This adds a user, it is different since only those with the admin role can access it and they are able to specify the user role (usertype)**
-instance.add_user(username,password,usertype)
+```python
+instance.set_dev_mode(True)  # Enable developer mode
+instance.set_dev_mode(False) # Disable developer mode
+```
 
-**if you want to add a custom role to the user you can use this format, Note| the role specified as custom role is automatically added to the permissions file as a role which is empty and you can add permissions to this role with the custom permissions explanation below**
-instance.add_user(username,password,("custom","Custom role))
+### **Register a User**
+Registers a new user. By default, the assigned role is `User`.
 
-*Adding Roles*
-**alternatively you can add custom role using the add role method**
-instance.add_role("hello","permission")**you dont have to specify a permission it will just save the role with an empty list of permissions, if you do assign a permission only assign one**
+```python
+instance.register(username, password)
+```
 
-*Remove role*
-**removes a specified user, eg this will remove the admin role**
-Remove User:
-Only Admins can use this command(unless Developer Mode is enabled)
+### **Login**
+Authenticates external user credentials. Credentials are auto-saved to a JSON file.
 
+```python
+instance.login(username, password)
+```
+
+### **Add User**
+Allows an Admin to add a user and specify a role.
+
+```python
+instance.add_user(username, password, usertype)
+```
+
+To assign a **custom role**, use:
+
+```python
+instance.add_user(username, password, ("custom", "Custom Role"))
+```
+*Note: The specified role is automatically added to the permissions file with an empty permission list.*
+
+### **Adding Roles**
+Define custom roles using the `add_role` method.
+
+```python
+instance.add_role("hello", "permission")
+```
+*Note: If no permission is specified, the role is created with an empty permission list.*
+
+### **Remove User**
+Only Admins (or users in Developer Mode) can remove users.
+
+```python
 instance.remove_user("username")
+```
 
-*Assign Custom Permission:*
-        **the custom permission is a function used to assign a user specified function ehich you want to assign to a role example below**
+### **Assign Custom Permissions**
+Custom permissions allow users to define and bind functions to roles.
 
-        def hello():
-            print("hello")
-        **stores the hello function as a method for selective execution by a specified role**
-        instance.custom_permission(hello)
+```python
+def hello():
+    print("hello")
 
-        **this binds the hello function to the Admin role**
-        instance.bind("Admin","hello")
+instance.custom_permission(hello)  # Store the function
+instance.bind("Admin", "hello")   # Bind the function to the Admin role
+```
 
-        **Note bind can be used to bind module methods to roles as well like this:**
-        instance.bind("user","add_user") **now users can use add_user method**
+You can also bind module methods to roles:
 
-        instance.execute("hello")
-        **this executes the custom function this is important because you the user can specify custom functions you want external users to be able to do (manage them)**
+```python
+instance.bind("User", "add_user")  # Now 'User' role can use the add_user method
+```
 
-*Reset Password:*
-**this resets the password to a specified password, it is NOT adviced to use this on its you should add an extra authentication to get like a pass key or answer to a question to ensure security of your script REMEMBER THIS MODULE IS JUST A FRAMEWORK**
-instance.reset_password("username", "new password")
+Execute a bound function:
 
-*view user information*
-**this returns the user information as a dictionary, tip: store it in a variable eg,**
+```python
+instance.execute("hello")
+```
+
+### **Reset Password**
+Resets a user's password. It is recommended to add additional authentication (e.g., security questions) for security purposes.
+
+```python
+instance.reset_password("username", "new_password")
+```
+
+### **View User Information**
+Returns user details as a dictionary.
+
+```python
 user_info = instance.view_userinfo("darell")
+print(user_info)
+```
+## **Logging Custom Messages**
+Allows the user to log custom messages in the user logs.
+
+```python
+instance.log("level","Message")
+```
+
+---
+
+## **Notes**
+- Always disable **Developer Mode** in production environments.
+- Ensure appropriate authentication before resetting passwords.
+- Regularly review role-based permissions for security.
+- The log levels are info, warning and critical
+
+---
+## **Structural Overview**
+│── data/
+│   ├── permission.json      # Stores roles and permissions
+│   ├── userdata.json        # Stores user credentials
+│
+│── logfiles/
+│   ├── general_logs.log     # Logs general system activity
+│   ├── user_logs.log        # Logs user activity
+│
+│── authbarn.py              # Main authentication and Management logic
+│── config.py                # Auto creates necessary files once the user runs this module in a script
+│── logger.py                # logs script wide actions to general_logs and user actions to user_logs
+│── README.md                # Documentation
+**AuthBarn - Secure and Lightweight Authentication for Your Python Applications!** 
