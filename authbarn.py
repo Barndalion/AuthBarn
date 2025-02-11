@@ -93,7 +93,7 @@ class Authentication():
 class Action(Authentication):
     _dev_mode = False
     def __init__(self):
-        self.custom_function = []
+        self.custom_function = [perm for permissions in defined_permissions.values() for perm in permissions]
         super().__init__()
         
     def set_dev_mode(self,Enabled:bool):
@@ -137,7 +137,10 @@ class Action(Authentication):
                 
         if isinstance(usertype,tuple) :
             if usertype[0].lower()=='custom':
+                defined_permissions[usertype[1]] = []
                 usertypeid = usertype[1]
+                Action.save_json(PERMISSION_FILE,defined_permissions)
+                general_logger.info(f"{usertype[1]} Successfully Added as a Role")
             else:
                 raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
         elif usertype in ["Admin","User"]:
@@ -230,12 +233,7 @@ class Action(Authentication):
                 self.log("warning", f"{permission_name} is not a function")
         else:
             raise NotFound(f"No Function Saved As {permission_name}")
+        
 instance = Action()
-instance.add_user("Darell","1234","Admin")
 instance.set_dev_mode(True)
-def hello():
-    print("Hello World")
-
-instance.custom_permission("hello")
-instance.bind("Admin","hello")
-instance.execute("hello")
+instance.bind("User","add_user")
