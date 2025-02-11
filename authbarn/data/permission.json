@@ -1,10 +1,3 @@
 {
-    "Admin": [
-        "hello",
-        "add_user"
-    ],
-    "User": [
-        "add_user"
-    ],
-    "doodoo": []
+ 
 }
