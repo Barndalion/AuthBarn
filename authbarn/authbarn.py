@@ -2,8 +2,8 @@ import json
 import os
 import hashlib
 import shutil
-from logger import user_logger,general_logger
-from config import PERMISSION_FILE,USERDATA_FILE,LOG_DIR
+from .logger import user_logger,general_logger
+from .config import PERMISSION_FILE,USERDATA_FILE,LOG_DIR
 
 class Undefined(Exception):
     pass
