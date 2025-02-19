@@ -7,7 +7,12 @@
 AuthBarn is a lightweight Python authentication system with user management and role-based permissions. It is designed for standalone use or integration into larger applications.
 
 ---
+### Update Notes
+- made the module able to integrate with flask by making each method return true if execution was successful but a dictionary with state: false and message:error message if execution failed
 
+- Added a duplicate method to duplicate the log files to the hosting direcory of this module(will explain furhter below)
+
+- Added function calls so you can import individual methods that you want to use in your hosting script
 ## **Terminology**
 Several key terms are used frequently in this document:
 
@@ -15,6 +20,8 @@ Several key terms are used frequently in this document:
 - **Roles**: Defined system roles (e.g., Admin, User, or a custom role). Roles determine the available permissions for a user.
 - **User**: The individual installing and managing this module.
 - **External User**: The individuals using your script once this module is integrated.
+- **Hosting Script**: The script which you import the module to.
+
 
 ---
 
@@ -23,66 +30,61 @@ Several key terms are used frequently in this document:
 - **Logging**: Maintains two log files—general logs (tracks all module actions) and user logs (tracks user actions). Users can log custom actions/messages. Logging can be enabled or disabled.
 - **Hashing**: Utilizes `hashlib`'s PBKDF2-HMAC to securely store user passwords as random hex strings.
 - **Permission Management**: Allows adding/removing roles, adding/removing permissions, and executing custom functions.
-- **Developer Mode**: Grants full access to all methods/functions. It is recommended to disable this mode when managing external users.
+- **Developer Mode**: Grants full access to all methods/functions and also enables exception mode. It is recommended to disable this mode if implementing in production. 
 
 ---
 
 ## **Installation**
-```python
-pip install authbarn
-```
-## **Configuration Settings**
-to set up logging mode import authentication from authbarn then set logging to true
-```python
-from authbarn import Authentication
-instance2 = Authentication(enable_logging = True)
-instance2 = Authentication(enable_logging = False)
-```
+Run this Command in terminal: pip install --index-url https://testpypi.org/simple/AuthBarn
 
+For now the module is on test pypi for testing before being actually released
+
+## **Configuration Settings**
+To set up the module Attach the Action class to a instance, and enable logging and _dev_mode (_dev_mode should be enabled if you're scripting and disabled when releaseing for external users)
+
+Setting Up the Module
+```python
+import AuthBarn
+instance = Action()
+```
+Configuring Settings
 ```python
 from AuthBarn import Action
-instance = Action()
+instance = Action(enable_logging = True,_dev_mode = True) #by default both are set to false
 ```
 
 ---
 
 ## **Usage Guide**
 
-### **Developer Mode**
-Developer mode allows unrestricted access to all methods without requiring authentication. It should be enabled only during debugging and disabled afterward.
-
-```python
-instance.set_dev_mode(True)  # Enable developer mode
-instance.set_dev_mode(False) # Disable developer mode
-```
-
 ### **Register a User**
 Registers a new user. By default, the assigned role is `User`.
 
 ```python
-instance.register(username, password)
+instance.register(username, password) #the username is hashed and stored as a hash value with a salt for security
 ```
 
 ### **Login**
 Authenticates external user credentials. Credentials are auto-saved to a JSON file.
 
 ```python
-instance.login(username, password)
+instance.login(username, password) #hashes the password entered and compare it with the stored hash password of that user
 ```
 
 ### **Add User**
-Allows an Admin to add a user and specify a role.
+Allows an Admin or any role with this permission to add a user and specify a role.
 
 ```python
 instance.add_user(username, password, usertype)
 ```
 
-To assign a **custom role**, use:
-
+Adding A custom Role **custom role**
+This adds 
 ```python
 instance.add_user(username, password, ("custom", "Custom Role"))
 ```
 *Note: The specified role is automatically added to the permissions file with an empty permission list.*
+*Note: Also remember to specify its permissions by binding them to the role and if you want to execute this permission you can do it dynamically with the execute method*
 
 ### **Adding Roles**
 Define custom roles using the `add_role` method.
@@ -93,7 +95,7 @@ instance.add_role("hello", "permission")
 *Note: If no permission is specified, the role is created with an empty permission list.*
 
 ### **Remove User**
-Only Admins (or users in Developer Mode) can remove users.
+Removes a specified user from Storage
 
 ```python
 instance.remove_user("username")
@@ -144,7 +146,18 @@ instance.log("level","Message")
 ```
 
 ---
+## **Messages and Returns**
+This Module was modified to work better in web development with the Aid of flask, therefore I modified the return values. 
+The returned value if execution is successful is True and if false is a dictionary in the format
 
+```python
+# return Messages are only Given if _dev_mode is disabled otherwise Exceptions will be raised to make debugging easier 
+
+if instance.login(username,password) == True:
+    print("Successful")
+else:
+    print(instance.login(username,password)["message"]) #this prints the error message that occured
+```
 ## **Notes**
 - Always disable **Developer Mode** in production environments.
 - Ensure appropriate authentication before resetting passwords.

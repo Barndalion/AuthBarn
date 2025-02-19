@@ -23,7 +23,7 @@ with open(USERDATA_FILE,'r') as userfile:
    userdata = json.load(userfile)
 
 class Authentication():
-    def __init__(self,enable_logging=True, _dev_mode=True):
+    def __init__(self,enable_logging=False, _dev_mode=False):
        self._dev_mode = _dev_mode
        self.username = None
        self.password = None
@@ -109,7 +109,7 @@ class Authentication():
         return True
 
 class Action(Authentication):
-    def __init__(self,enable_logging=True,_dev_mode=False):
+    def __init__(self,enable_logging=False,_dev_mode=False):
         super().__init__(enable_logging,_dev_mode)
         
         self.custom_function = [perm for permissions in defined_permissions.values() for perm in permissions]
@@ -311,3 +311,13 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
+instance = Action(_dev_mode = False)
+password = input()
+username = input()
+
+
+
+if instance.login(username,password) == True:
+    print("success")
+else:
+    print(instance.login(username,password)["state"])

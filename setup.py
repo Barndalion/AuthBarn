@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 
 setup(
     name="AuthBarn",  
-    version="0.1.1",
+    version="0.1.4",
     author="Darell Barnes",
     author_email="darellbarnes450@gmail.com",
     description="User authentication and role-based management.",
