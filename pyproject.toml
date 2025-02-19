@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "AuthBarn"
-version = "0.1.2"
+version = "0.1.3"
 authors = [
     { name="Darell Barnes", email="darellbarnes450@gmail.com" }
 ]
