@@ -42,9 +42,7 @@ Several key terms are used frequently in this document:
 ---
 
 ## **Installation**
-Run this Command in terminal: pip install --index-url https://testpypi.org/simple/AuthBarn
-
-For now the module is on test pypi for testing before being actually released
+pip install AuthBarn
 
 ## **Configuration Settings**
 To set up the module Attach the Action class to a instance, and enable logging and _dev_mode (_dev_mode should be enabled if you're scripting and disabled when releaseing for external users)
