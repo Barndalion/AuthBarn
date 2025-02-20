@@ -1,7 +1,7 @@
 # AuthBarn
 
 ## Creator: Darell Barnes  
-## Version: 0.1.7
+## Version: 0.1.8
 ## Email: barndalion@gmail.com
 
 ### Description
@@ -18,6 +18,8 @@ AuthBarn is a lightweight Python authentication system with user management and 
 - Fixed register function and made integration with flask better 
 
 - removed test code at the bottom of the module
+
+- Fixed permission file
 ## **Terminology**
 Several key terms are used frequently in this document:
 
