@@ -1,7 +1,12 @@
 # AuthBarn
 
 ## Creator: Darell Barnes  
+<<<<<<< HEAD
 ## Version: 0.1.7
+=======
+## Version: 0.1.5
+## Email: barndalion@gmail.com
+>>>>>>> 2c3b2dc3ff0e41ecae8af6c7637199c4a6b607e2
 
 ### Description
 AuthBarn is a lightweight Python authentication system with user management and role-based permissions. It is designed for standalone use or integration into larger applications.
