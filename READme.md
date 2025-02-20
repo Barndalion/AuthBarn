@@ -1,7 +1,7 @@
 # AuthBarn
 
 ## Creator: Darell Barnes  
-## Version: 0.1.0
+## Version: 0.1.7
 
 ### Description
 AuthBarn is a lightweight Python authentication system with user management and role-based permissions. It is designed for standalone use or integration into larger applications.
@@ -13,6 +13,10 @@ AuthBarn is a lightweight Python authentication system with user management and 
 - Added a duplicate method to duplicate the log files to the hosting direcory of this module(will explain furhter below)
 
 - Added function calls so you can import individual methods that you want to use in your hosting script
+
+- Fixed register function and made integration with flask better 
+
+- removed test code at the bottom of the module
 ## **Terminology**
 Several key terms are used frequently in this document:
 

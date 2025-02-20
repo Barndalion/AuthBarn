@@ -8,9 +8,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "AuthBarn"
-version = "0.1.4"
+version = "0.1.7"
 authors = [
-    { name="Darell Barnes", email="darellbarnes450@gmail.com" }
+    { name="Darell Barnes", email="barndalion@gmail.com" }
 ]
 description = "User authentication and role-based management."
 readme = "README.md"

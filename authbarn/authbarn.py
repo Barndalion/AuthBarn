@@ -27,7 +27,7 @@ class Authentication():
        self._dev_mode = _dev_mode
        self.username = None
        self.password = None
-       self.role = "Admin"
+       self.role = None
        self.allowed = []
        self.enable_logging = enable_logging
 
@@ -61,13 +61,13 @@ class Authentication():
                   self.allowed = defined_permissions[self.role]
                   general_logger.info("Login Successful")
                   return True
-             elif self._dev_mode:
+             elif self._dev_mode == True:
                 general_logger.critical("Incorrect Username or Password!")
                 raise IncorrectPassword("Incorrect Password")
              else:
                  general_logger.critical("Incorrect Username or Password!")
                  return {"state":False,"message":"Incorrect Username or Password!"}
-        elif self._dev_mode:
+        elif self._dev_mode == True:
             general_logger.warning("Username Not Found")
             raise UsernameNotFound(f"{username} Not Found")
         else:
@@ -75,20 +75,27 @@ class Authentication():
             return {"state":False,"message":"Username Not Found"}
         
     def register(self,name,password):
-        self.role = "User"
+        role = "User"
         if name in userdata:
-            raise NameError(f"{name} Already Exists")
-        Action._dev_mode = True
-        new_password = self.hashed_password(password)
-        self.add_user(name,new_password,self.role)  
-        Action._dev_mode = False
-        self.username = name
-        self.password = new_password 
-        general_logger.info(f"{name} Successfully Registered!!") 
+            if self._dev_mode == True:
+                raise AlreadyExist("Name Already Exists")
+            else:
+                general_logger.warning("Name Already Exists")
+                return {"state":False,"message":"Name Already Exists"}
+        
+        hashing_password = self.hashed_password(password)
+            
+        Newuser = {name:[hashing_password,role]}
+        userdata.update(Newuser)
+        general_logger.info("Successfully Registered")
+
+        Action.save_json(USERDATA_FILE,userdata)
+        return True
+
 
     def reset_password(self,username,new_password):
         if username not in userdata:
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.warning("Username Not Found")
                 raise NotFound(f"Username {username} Not Found")
             else:
@@ -96,7 +103,7 @@ class Authentication():
                 return {"state":False,"message":"Username Not Found"}
                 
         if new_password == userdata[username][0]:
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.warning("New Password Cant Be The Same As Old Password")
                 raise AlreadyExist("New Password Cant Be The Same As Old Password")
             else:
@@ -122,14 +129,9 @@ class Action(Authentication):
 
         destination_path = os.path.join(destination_folder, os.path.basename(LOG_DIR))
         shutil.copy2(LOG_DIR, destination_path)
-        
-    def set_dev_mode(self,Enabled:bool):
-        Action._dev_mode = Enabled
-        status = "Enabled" if Enabled else "Disabled"
-        general_logger.info(f"Admin Set Status to {status}")
 
     def add_role(self,new_role, permissions):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "add_role"
             self.verifypermissions(perm)
 
@@ -138,7 +140,7 @@ class Action(Authentication):
             general_logger.info(f"Added Role: {new_role}")
             Action.save_json(PERMISSION_FILE,defined_permissions)
             return True
-        elif self._dev_mode:
+        elif self._dev_mode == True:
             general_logger.warning("Role Already Exists")
             raise AlreadyExist(f"{new_role} Already Exist")
         else:
@@ -146,7 +148,7 @@ class Action(Authentication):
             return {"state":False,"message":"Role Already Exist"}
        
     def remove_role(self,role_to_remove):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "remove_role"
             self.verifypermissions(perm)
         if role_to_remove in defined_permissions:
@@ -154,7 +156,7 @@ class Action(Authentication):
             general_logger.info(f"Removed Role: {role_to_remove}")
             Action.save_json(PERMISSION_FILE,defined_permissions)
             return True
-        elif self._dev_mode:
+        elif self._dev_mode == True:
             general_logger.info(f"No Role Called: {role_to_remove}")
             raise UsernameNotFound(f"No Role Called {role_to_remove}")
         else:
@@ -162,13 +164,13 @@ class Action(Authentication):
             return {"state":False,"message":f"No Role Called {role_to_remove}"}
       
     def add_user(self,username,password,usertype):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "add_user"
             self.verifypermissions(perm)
 
         if isinstance(username, list) and isinstance(password, list):
             if len(username) != len(password):
-                if self._dev_mode:
+                if self._dev_mode == True:
                     raise Undefined("Lists for bulk user creation must be of the same length.")
                 else:
                     return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
@@ -179,12 +181,12 @@ class Action(Authentication):
                 
         if isinstance(usertype,tuple):
             if usertype[0].lower()=='custom':
-                if not self._dev_mode:
+                if self._dev_mode == False:
                     defined_permissions[usertype[1]] = []
                     usertypeid = usertype[1]
                     Action.save_json(PERMISSION_FILE,defined_permissions)
                     general_logger.info(f"{usertype[1]} Successfully Added as a Role")
-                if self._dev_mode:
+                if self._dev_mode == True:
                     raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
                 else:
                     return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
@@ -193,7 +195,7 @@ class Action(Authentication):
             if not self._dev_mode:
                 general_logger.info(f"{usertype} Successfully Added User")
                 usertypeid = usertype.capitalize()
-            elif self._dev_mode:
+            elif self._dev_mode == True:
                 raise Undefined(f"{usertype} is not a defined Role")
             else:
                 return {"state":False,"message":f"{usertype} is not a defined Role"}
@@ -206,7 +208,7 @@ class Action(Authentication):
         Action.save_json(USERDATA_FILE,userdata)
 
     def remove_user(self,remove_ans):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "remove_user"
             self.verifypermissions(perm)
         if remove_ans in userdata:
@@ -223,7 +225,7 @@ class Action(Authentication):
             json.dump(data,f, indent=4)
     
     def view_userinfo(self,toview):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "view_userinfo"
             self.verifypermissions(perm)
         if toview not in userdata and toview.lower() != "all":
@@ -235,7 +237,7 @@ class Action(Authentication):
             general_logger.info(f"{self.username} requested to view all users")
             return userdata
         else:
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
                 raise UsernameNotFound("Username Name Not Found")
             else:
@@ -246,7 +248,7 @@ class Action(Authentication):
         if tryperm in self.allowed:
                return
         else:
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.info(f"Permission Not Allowed For {self.role}")
                 raise PermissionDenied("info", f"Permission Not Allowed For {self.role}")
             else:
@@ -254,12 +256,12 @@ class Action(Authentication):
                 return {"state":False,"message":f"Permission Not Allowed For {self.role}"}
     
     def custom_permission(self,permnission_name):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "custom_permission"
             self.verifypermissions(perm)
 
         if not callable(permnission_name):
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.warning(f"{permnission_name} Not Found Please Define Function")
                 raise NotFound(f"{permnission_name}  Not Found Please Define Function")
             else:
@@ -271,14 +273,14 @@ class Action(Authentication):
             self.custom_function.append(permnission_name)
             general_logger.info(f"Successfully Added {permnission_name} as a custom permission")
             return True
-        elif self._dev_mode:
+        elif self._dev_mode == True:
             general_logger.warning("Permission already exists")
             raise AlreadyExist(f"{func_name} Already Exist")
         else:
             return {"state":False,"message":"Permission Already Exist"}
 
     def bind(self,add_to,permname):
-        if not Action._dev_mode:
+        if not self._dev_mode:
             perm = "bind"
             self.verifypermissions(perm)
 
@@ -300,7 +302,7 @@ class Action(Authentication):
             perm = "execute"
             self.verifypermissions(perm)
         if permission_name not in self.custom_function:
-            if self._dev_mode:
+            if self._dev_mode == True:
                 general_logger.warning(f"{permission_name} is not a function")
                 raise NotFound("Function Not Found")
             else: 
@@ -311,13 +313,3 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
-instance = Action(_dev_mode = False)
-password = input()
-username = input()
-
-
-
-if instance.login(username,password) == True:
-    print("success")
-else:
-    print(instance.login(username,password)["state"])

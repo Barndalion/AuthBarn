@@ -2,9 +2,9 @@ from setuptools import setup,find_packages
 
 setup(
     name="AuthBarn",  
-    version="0.1.4",
+    version="0.1.6",
     author="Darell Barnes",
-    author_email="darellbarnes450@gmail.com",
+    author_email="barndalion@gmail.com",
     description="User authentication and role-based management.",
     long_description=open("READme.md").read(),
     long_description_content_type="text/markdown",
@@ -12,7 +12,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,  
     package_data={
-        "authbarn": ["data/*.json", "logfiles/*.log"],
+        "AuthBarn": ["data/*.json", "logfiles/*.log"],
     },
     classifiers=[
         "Programming Language :: Python :: 3",
