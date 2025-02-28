@@ -25,7 +25,6 @@ with open(USERDATA_FILE,'r') as userfile:
 class Authentication():
     def __init__(self,enable_logging=False, _dev_mode=False):
        self._dev_mode = _dev_mode
-       self.allowed = []
        self.enable_logging = enable_logging
 
     def log(self,level,message):
@@ -51,9 +50,11 @@ class Authentication():
     
     def generate_token(self,username,role):
         secret_key = "e4f8b13c7a2e4a9db6d8e5f8b7c2a1d4f3e6c8b9a0d7e5f6c3b2a1f4e7d9c6b8"
+        permission = defined_permissions.get[role,[]]
         payload = {
             "Username":username,
-            "Role":role
+            "Role":role,
+            "Permission": permission
         }
 
         token = jwt.encode(payload,secret_key,algorithm="HS256")
@@ -66,7 +67,9 @@ class Authentication():
              stored_password = userdata[username][0]
              if self.verify_password(stored_password,password):
                   general_logger.info("Login Successful")
-                  return True
+                  role = userdata[username][1]
+                  token = self.generate_token(username,role)
+                  return {"state":True,"token":token}
              elif self._dev_mode == True:
                 general_logger.critical("Incorrect Username or Password!")
                 raise IncorrectPassword("Incorrect Password")
@@ -78,7 +81,7 @@ class Authentication():
             raise UsernameNotFound(f"{username} Not Found")
         else:
             general_logger.warning("Username Not Found")
-            return {"state":False,"message":"Username Not Found"}
+            return {"state":False,"message":"Username Not Found"} 
         
     def register(self,name,password):
         role = "User"
@@ -223,8 +226,12 @@ class Action(Authentication):
             general_logger.info(f"{remove_ans} Removed Successfully")
             return True
         else:
-            general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
-            return {"state":False,"message":f"NO RECORDS NAMED {remove_ans}"}
+            if self._dev_mode == True:
+                general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
+                raise UsernameNotFound(f"Username {remove_ans} Not Found")
+            else:
+                general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
+                return {"state":False,"message":f"NO RECORDS NAMED {remove_ans}"}
     @staticmethod
     def save_json(filepath,data):
         with open(filepath, 'w') as f:
@@ -250,8 +257,10 @@ class Action(Authentication):
                 general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
                 return f"{toview} Does Not Exist!"
         
-    def verifypermissions(self,tryperm):
-        if tryperm in self.allowed:
+    def verifypermissions(self,perm):
+        decoded = jwt.decode(token, "e4f8b13c7a2e4a9db6d8e5f8b7c2a1d4f3e6c8b9a0d7e5f6c3b2a1f4e7d9c6b8", algorithms=["HS256"])
+        allowed_permissions = decoded.get("Permission",[])
+        if perm in allowed_permissions:
                return
         else:
             if self._dev_mode == True:
