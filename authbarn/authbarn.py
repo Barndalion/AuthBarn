@@ -1,9 +1,9 @@
 import json
 import os
 import hashlib
-import shutil
-from .logger import user_logger,general_logger
-from .config import PERMISSION_FILE,USERDATA_FILE,LOG_DIR
+import jwt
+from logger import user_logger,general_logger
+from config import PERMISSION_FILE,USERDATA_FILE,LOG_DIR
 
 class Undefined(Exception):
     pass
@@ -25,9 +25,6 @@ with open(USERDATA_FILE,'r') as userfile:
 class Authentication():
     def __init__(self,enable_logging=False, _dev_mode=False):
        self._dev_mode = _dev_mode
-       self.username = None
-       self.password = None
-       self.role = None
        self.allowed = []
        self.enable_logging = enable_logging
 
@@ -51,14 +48,23 @@ class Authentication():
         salt = bytes.fromhex(salt)    
         new_hash = hashlib.pbkdf2_hmac('sha256', enter_password.encode(), salt, 100000)
         return new_hash.hex() == stored_hash
+    
+    def generate_token(self,username,role):
+        secret_key = "e4f8b13c7a2e4a9db6d8e5f8b7c2a1d4f3e6c8b9a0d7e5f6c3b2a1f4e7d9c6b8"
+        payload = {
+            "Username":username,
+            "Role":role
+        }
+
+        token = jwt.encode(payload,secret_key,algorithm="HS256")
+
+        return token
+
         
     def login(self,username,password):
         if username in userdata:
              stored_password = userdata[username][0]
              if self.verify_password(stored_password,password):
-                  self.username = username 
-                  self.role = userdata[username][1] 
-                  self.allowed = defined_permissions[self.role]
                   general_logger.info("Login Successful")
                   return True
              elif self._dev_mode == True:
@@ -121,14 +127,14 @@ class Action(Authentication):
         
         self.custom_function = [perm for permissions in defined_permissions.values() for perm in permissions]
         
-    def duplicate(self,destination_folder=None):
-        if destination_folder == None:
-            destination_folder = os.getcwd()
-
-        os.makedirs(destination_folder, exist_ok=True)
-
-        destination_path = os.path.join(destination_folder, os.path.basename(LOG_DIR))
-        shutil.copy2(LOG_DIR, destination_path)
+    def duplicate():
+        copy_file = os.getcwd()
+        try:
+            with open(LOG_DIR, "r") as src, open(copy_file, "w") as dest:
+                dest.write(src.read())
+            return {"state":True,"message":"Successfully duplicated"}
+        except:
+            PermissionError("Permission Denied")
 
     def add_role(self,new_role, permissions):
         if not self._dev_mode:
@@ -181,21 +187,21 @@ class Action(Authentication):
                 
         if isinstance(usertype,tuple):
             if usertype[0].lower()=='custom':
-                if self._dev_mode == False:
                     defined_permissions[usertype[1]] = []
                     usertypeid = usertype[1]
                     Action.save_json(PERMISSION_FILE,defined_permissions)
                     general_logger.info(f"{usertype[1]} Successfully Added as a Role")
+            else:
                 if self._dev_mode == True:
                     raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
                 else:
                     return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
                 
         elif usertype in ["Admin","User"]:
-            if not self._dev_mode:
                 general_logger.info(f"{usertype} Successfully Added User")
                 usertypeid = usertype.capitalize()
-            elif self._dev_mode == True:
+        else:
+            if self._dev_mode == True:
                 raise Undefined(f"{usertype} is not a defined Role")
             else:
                 return {"state":False,"message":f"{usertype} is not a defined Role"}
@@ -313,3 +319,8 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
+instance = Action(_dev_mode = True) 
+
+instance.add_user("Darell","lionel12$","User")
+token = instance.generate_token("Darell","User")
+print(token)
