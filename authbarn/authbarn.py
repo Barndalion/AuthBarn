@@ -1,6 +1,6 @@
 import json
 import os
-import hashlib
+import bcrypt
 import jwt
 import sqlite3 
 from logger import user_logger,general_logger
@@ -42,17 +42,12 @@ class Authentication():
             elif level == "critical":
                 user_logger.critical(message)
 
-    def hashed_password(self,password,salt=None):
-        if salt == None:
-            salt = os.urandom(16)
-        hashed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
-        return salt.hex() + ":" + hashed.hex()    
+    def hashed_password(self,password):
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode(), salt)
 
-    def verify_password(self,stored_password, enter_password):
-        salt,stored_hash = stored_password.split(':') 
-        salt = bytes.fromhex(salt)    
-        new_hash = hashlib.pbkdf2_hmac('sha256', enter_password.encode(), salt, 100000)
-        return new_hash.hex() == stored_hash
+    def verify_password(self,enter_password, stored_password):
+        return bcrypt.checkpw(enter_password.encode(),stored_password)
     
     def generate_token(self,username,role):
         defined_permissions = load_json(PERMISSION_FILE)
@@ -134,14 +129,9 @@ class Authentication():
         
         cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
         userdata = cursor.fetchone()
-        hash,old_password = userdata[2].split(":")
-        print(hash)
-        print(old_password)
-        password = self.hashed_password(new_password)
-        passhash,password2 = password.split(":")
-                
-        if password2 == old_password:
-            
+        old_password = userdata[2]        
+        
+        if self.verify_password(new_password,old_password):
             if self._dev_mode == True:
                 general_logger.warning("New Password Cant Be The Same As Old Password")
                 raise AlreadyExist("New Password Cant Be The Same As Old Password")
@@ -149,9 +139,8 @@ class Authentication():
                 general_logger.warning("New Password Cant Be The Same As Old Password")
                 return {"state":False,"message":"New Password Cant Be The Same As Old Password"}
             
-        
-        print(new_password)
-        cursor.execute("UPDATE data SET password = ? WHERE username = ?",(new_password,username))
+        password = self.hashed_password(new_password)
+        cursor.execute("UPDATE data SET password = ? WHERE username = ?",(password,username))
         conn.commit()
         conn.close()
         return True
@@ -359,4 +348,4 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
-print(Authentication(_dev_mode=True).reset_password("darell", "1234"))
+print(Authentication(_dev_mode=True).reset_password("darell", "dar"))
