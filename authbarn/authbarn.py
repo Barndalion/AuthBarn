@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import bcrypt
 import jwt
 import sqlite3 
@@ -22,7 +23,7 @@ class PermissionDenied(Exception):
 def load_json(filepath):
     with open(filepath, 'r') as f:
         return json.load(f)
-default = {"Admin:[]"}
+default = {"Admin":[]}
 ensure_json_exists(PERMISSION_FILE,default)
 setup_db1()
 
@@ -31,7 +32,7 @@ class Authentication():
     def __init__(self,enable_logging=False, _dev_mode=False):
        self._dev_mode = _dev_mode
        self.enable_logging = enable_logging
-       self.token = None
+       self.local_data = threading.local()
 
     def log(self,level,message):
         if self.enable_logging:
@@ -51,14 +52,13 @@ class Authentication():
     
     def generate_token(self,username,role):
         defined_permissions = load_json(PERMISSION_FILE)
-        secret_key = SECRET_KEY
-        permission = defined_permissions[role]
+        permission = defined_permissions.get(role,[])
         payload = {
             "Username":username,
             "Role":role,
             "Permission": permission
         }
-        token = jwt.encode(payload,secret_key,algorithm="HS256")
+        token = jwt.encode(payload,SECRET_KEY,algorithm="HS256")
         return token
    
     def login(self,username,password):
@@ -82,7 +82,7 @@ class Authentication():
               general_logger.info("Login Successful")
               role = data[3]
               token = self.generate_token(data[1],role)
-              self.token = token
+              self.local_data.token = token
               return {"state":True,"token":token}
         elif self._dev_mode == True:
             general_logger.critical("Incorrect Username or Password!")
@@ -129,7 +129,7 @@ class Authentication():
         
         cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
         userdata = cursor.fetchone()
-        old_password = userdata[2]        
+        old_password = userdata[2].encode()       
         
         if self.verify_password(new_password,old_password):
             if self._dev_mode == True:
@@ -147,9 +147,8 @@ class Authentication():
 
 class Action(Authentication):
     def __init__(self,enable_logging=False,_dev_mode=False):
-        defined_permissions = load_json(USERDATA_FILE)
-        super().__init__(enable_logging,_dev_mode)
-        
+        defined_permissions = load_json(PERMISSION_FILE)
+        super().__init__(enable_logging,_dev_mode) 
         self.custom_function = [perm for permissions in defined_permissions.values() for perm in permissions]
         
     def add_role(self,new_role, permissions):
@@ -216,7 +215,7 @@ class Action(Authentication):
                 else:
                     return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
                 
-        elif usertype in ["Admin","User"]:
+        elif usertype in defined_permissions:
                 general_logger.info(f"{usertype} Successfully Added User")
                 usertypeid = usertype.capitalize()
         else:
@@ -256,17 +255,28 @@ class Action(Authentication):
             json.dump(data,f, indent=4)
     
     def view_userinfo(self,toview):
-        userdata = load_json(USERDATA_FILE)
+        conn = connect_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT Username FROM data")
+        userdata = cursor.fetchall()
+
+        names = {names[0] for names in userdata}
+
         if not self._dev_mode:
             perm = "view_userinfo"
             self.verifypermissions(perm)
-        if toview not in userdata and toview.lower() != "all":
+
+        if toview not in names and toview.lower() != "all":
             return {"state":False,"message":f"{toview} Does Not Exist!"}
-        if toview in userdata:
-            general_logger.info(f"{self.token["Username"]} requested to view {toview}")
-            return {toview:userdata[toview]}
+        if toview in names:
+            general_logger.info(f"{self.local_data.token['Username']} requested to view {toview}")
+            cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
+            data = cursor.fetchone()
+            namedata = {x[0] for x in data}
+            return namedata
         elif toview.lower() == "all":
-            general_logger.info(f"{self.token["Username"]} requested to view all users")
+            general_logger.info(f"{self.local_data.token['Username']} requested to view all users")
             return userdata
         else:
             if self._dev_mode == True:
@@ -277,10 +287,10 @@ class Action(Authentication):
                 return f"{toview} Does Not Exist!"
         
     def verifypermissions(self,perm):
-        decoded = jwt.decode(self.token, "e4f8b13c7a2e4a9db6d8e5f8b7c2a1d4f3e6c8b9a0d7e5f6c3b2a1f4e7d9c6b8", algorithms=["HS256"])
+        decoded = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
         allowed_permissions = decoded.get("Permission",[])
         if perm in allowed_permissions:
-               return
+               return 
         else:
             if self._dev_mode == True:
                 general_logger.info(f"Permission Not Allowed For {self.role}")
@@ -348,4 +358,7 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
-print(Authentication(_dev_mode=True).reset_password("darell", "dar"))
+instance = Action(_dev_mode = True)
+# instance.register("darell","1234")
+instance.login("darell","1234")
+print(instance.view_userinfo("darell"))
