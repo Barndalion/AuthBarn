@@ -78,7 +78,7 @@ class Authentication():
                  return {"state":False, "message":"Username not found"}
         
         stored_password = data[2]
-        if self.verify_password(stored_password,password):
+        if self.verify_password(password,stored_password):
               general_logger.info("Login Successful")
               role = data[3]
               token = self.generate_token(data[1],role)
@@ -186,11 +186,18 @@ class Action(Authentication):
             general_logger.info(f"No Role Called: {role_to_remove}")
             return {"state":False,"message":f"No Role Called {role_to_remove}"}
       
-    def add_user(self,username,password,usertype):
-        defined_permissions = load_json(PERMISSION_FILE)    
+    def add_user(self,username,password,usertype="User"):
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        defined_permissions = load_json(PERMISSION_FILE)
         if not self._dev_mode:
             perm = "add_user"
             self.verifypermissions(perm)
+
+        if ':' not in password:
+            password = self.hashed_password(password)
+            general_logger.info(f"Admin Added {username} Successfully")
 
         if isinstance(username, list) and isinstance(password, list):
             if len(username) != len(password):
@@ -200,37 +207,38 @@ class Action(Authentication):
                     return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
         
             for user, pwd in zip(username, password):
-                self.add_user(user, pwd,usertype)  
+                cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,pwd,usertype))
+                conn.commit()
+                general_logger.info(f"Successfully Added Users")
             return {"state":True,"message":"Successfully Added List Of Users"}
                 
         if isinstance(usertype,tuple):
             if usertype[0].lower()=='custom':
                     defined_permissions[usertype[1]] = []
                     usertypeid = usertype[1]
+                    cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertypeid))
+                    conn.commit()
                     Action.save_json(PERMISSION_FILE,defined_permissions)
                     general_logger.info(f"{usertype[1]} Successfully Added as a Role")
+                    return {"state":True,"message":f"Successfully Added User {username} With Role {usertype[1]}"}
             else:
                 if self._dev_mode == True:
                     raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
                 else:
                     return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
                 
-        elif usertype in defined_permissions:
-                general_logger.info(f"{usertype} Successfully Added User")
-                usertypeid = usertype.capitalize()
-        else:
+        if usertype not in defined_permissions and not isinstance(usertype,tuple):
             if self._dev_mode == True:
-                raise Undefined(f"{usertype} is not a defined Role")
+                raise Undefined(f"Role {usertype} is not defined.")
             else:
-                return {"state":False,"message":f"{usertype} is not a defined Role"}
+                return {"state":False,"message":f"Role {usertype} is not defined."}
         
-        if ':' not in password:
-            password = self.hashed_password(password)
-            general_logger.info(f"Admin Added {username} Successfully")
-        userdata = load_json(USERDATA_FILE)
-       
-        userdata[username] = [password, usertypeid]
-        Action.save_json(USERDATA_FILE,userdata)
+        
+        
+        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertype))
+        conn.commit()
+
+        
 
     def remove_user(self,remove_ans):
         userdata = load_json(USERDATA_FILE)
@@ -270,10 +278,12 @@ class Action(Authentication):
         if toview not in names and toview.lower() != "all":
             return {"state":False,"message":f"{toview} Does Not Exist!"}
         if toview in names:
-            general_logger.info(f"{self.local_data.token['Username']} requested to view {toview}")
+            name = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
+            general_logger.info(f"{name['Username']} requested to view {toview}")
             cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
             data = cursor.fetchone()
-            namedata = {x[0] for x in data}
+            namedata = {"Username":data[1],"Password":data[2],"Role":data[3]}
+            conn.close()
             return namedata
         elif toview.lower() == "all":
             general_logger.info(f"{self.local_data.token['Username']} requested to view all users")
@@ -360,5 +370,5 @@ class Action(Authentication):
             return True
 instance = Action(_dev_mode = True)
 # instance.register("darell","1234")
-instance.login("darell","1234")
-print(instance.view_userinfo("darell"))
+instance.login("lionel","12345")
+print(instance.view_userinfo("sumn"))

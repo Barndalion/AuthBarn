@@ -11,3 +11,33 @@
 2025-03-18 22:44:09,092 - WARNING - New Password Cant Be The Same As Old Password
 2025-03-20 10:40:09,123 - WARNING - Function Call: view_userinfo, No User Called darell Found
 2025-03-20 10:41:43,443 - WARNING - Function Call: view_userinfo, No User Called darell Found
+2025-03-21 15:21:02,401 - INFO - Login Successful
+2025-03-21 15:22:13,646 - INFO - Login Successful
+2025-03-21 15:23:49,175 - INFO - Login Successful
+2025-03-21 15:24:18,166 - INFO - Login Successful
+2025-03-21 15:25:17,144 - INFO - Login Successful
+2025-03-21 15:26:17,740 - INFO - Login Successful
+2025-03-21 15:26:17,742 - INFO - eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VybmFtZSI6Imxpb25lbCIsIlJvbGUiOiJVc2VyIiwiUGVybWlzc2lvbiI6WyJFWEVDVVRFIiwiYnV5Il19.hzPpkQKdvErD-AMvd5wa593Aqxu8pBL2-MkW2zqS_40 requested to view lionel
+2025-03-21 15:27:42,071 - INFO - Login Successful
+2025-03-21 15:27:42,073 - INFO - lionel requested to view lionel
+2025-03-21 15:46:03,493 - INFO - Login Successful
+2025-03-21 15:46:03,499 - INFO - Successfully Added Users
+2025-03-21 15:46:03,502 - INFO - Successfully Added Users
+2025-03-21 15:46:03,506 - INFO - Successfully Added Users
+2025-03-21 15:47:33,436 - INFO - Login Successful
+2025-03-21 15:47:33,438 - INFO - detainee Successfully Added as a Role
+2025-03-21 15:50:45,471 - INFO - Login Successful
+2025-03-21 15:50:45,473 - INFO - detainee Successfully Added as a Role
+2025-03-21 15:50:45,699 - INFO - Admin Added sumn Successfully
+2025-03-21 15:52:29,481 - INFO - Login Successful
+2025-03-21 15:52:29,487 - INFO - detainee Successfully Added as a Role
+2025-03-21 15:52:29,717 - INFO - Admin Added sumn Successfully
+2025-03-21 15:55:22,046 - INFO - Login Successful
+2025-03-21 15:55:22,271 - INFO - Admin Added sumn Successfully
+2025-03-21 15:55:22,279 - INFO - detainee Successfully Added as a Role
+2025-03-21 15:55:58,320 - INFO - Login Successful
+2025-03-21 15:55:58,323 - INFO - lionel requested to view A
+2025-03-21 15:56:16,558 - INFO - Login Successful
+2025-03-21 15:56:16,560 - INFO - lionel requested to view A
+2025-03-21 15:56:31,740 - INFO - Login Successful
+2025-03-21 15:56:31,742 - INFO - lionel requested to view sumn
