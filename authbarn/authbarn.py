@@ -189,15 +189,12 @@ class Action(Authentication):
     def add_user(self,username,password,usertype="User"):
         conn = connect_db()
         cursor = conn.cursor()
+        usertypeid = usertype
 
         defined_permissions = load_json(PERMISSION_FILE)
         if not self._dev_mode:
             perm = "add_user"
             self.verifypermissions(perm)
-
-        if ':' not in password:
-            password = self.hashed_password(password)
-            general_logger.info(f"Admin Added {username} Successfully")
 
         if isinstance(username, list) and isinstance(password, list):
             if len(username) != len(password):
@@ -207,6 +204,7 @@ class Action(Authentication):
                     return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
         
             for user, pwd in zip(username, password):
+                pwd = self.hashed_password(pwd)
                 cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,pwd,usertype))
                 conn.commit()
                 general_logger.info(f"Successfully Added Users")
@@ -232,10 +230,9 @@ class Action(Authentication):
                 raise Undefined(f"Role {usertype} is not defined.")
             else:
                 return {"state":False,"message":f"Role {usertype} is not defined."}
-        
-        
-        
-        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertype))
+       
+        passwords = self.hashed_password(password)
+        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,passwords,usertypeid))
         conn.commit()
 
         
@@ -369,6 +366,6 @@ class Action(Authentication):
             func()
             return True
 instance = Action(_dev_mode = True)
-# instance.register("darell","1234")
-instance.login("lionel","12345")
-print(instance.view_userinfo("sumn"))
+instance.login("darell","1234")
+
+print(instance.view_userinfo("da"))
