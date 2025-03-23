@@ -7,11 +7,13 @@
         "add_user",
         "custom_permission",
         "bind",
-        "execute"
+        "execute",
+        "print_name"
     ],
     "User": [
         "EXECUTE",
         "buy"
     ],
-    "detainee": []
+    "detainee": [],
+    "sumn": []
 }

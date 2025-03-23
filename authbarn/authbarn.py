@@ -52,7 +52,7 @@ class Authentication():
     
     def generate_token(self,username,role):
         defined_permissions = load_json(PERMISSION_FILE)
-        permission = defined_permissions.get(role,[])
+        permission = defined_permissions[role]
         payload = {
             "Username":username,
             "Role":role,
@@ -147,9 +147,7 @@ class Authentication():
 
 class Action(Authentication):
     def __init__(self,enable_logging=False,_dev_mode=False):
-        defined_permissions = load_json(PERMISSION_FILE)
         super().__init__(enable_logging,_dev_mode) 
-        self.custom_function = [perm for permissions in defined_permissions.values() for perm in permissions]
         
     def add_role(self,new_role, permissions):
         defined_permissions = load_json(PERMISSION_FILE)
@@ -187,17 +185,33 @@ class Action(Authentication):
             return {"state":False,"message":f"No Role Called {role_to_remove}"}
       
     def add_user(self,username,password,usertype="User"):
+        defined_permissions = load_json(PERMISSION_FILE)
+
+        if self._dev_mode:
+            perm = "add_user"
+            general_logger.info(f"Permission: {perm}")
+            if self.verifypermissions(perm) == False:
+                general_logger.warning(f"Permission Denied")
+                return {"state":False,"message":f"Permission Denied"}
+            
         conn = connect_db()
         cursor = conn.cursor()
         usertypeid = usertype
 
-        defined_permissions = load_json(PERMISSION_FILE)
-        if not self._dev_mode:
-            perm = "add_user"
-            self.verifypermissions(perm)
+        cursor.execute("SELECT username FROM data")
+        name = cursor.fetchall()
+        names = {names[0] for names in name}
+
+        # if username in names:
+        #     general_logger.warning(f"{username} Already Exists")
+        #     if self._dev_mode == True:
+        #         raise AlreadyExist(f"{username} Already Exists")
+        #     else:
+        #         return {"state":False,"message":f"{username} Already Exists"}
 
         if isinstance(username, list) and isinstance(password, list):
             if len(username) != len(password):
+                general_logger.warning("Lists for bulk user creation must be of the same length.")
                 if self._dev_mode == True:
                     raise Undefined("Lists for bulk user creation must be of the same length.")
                 else:
@@ -206,8 +220,9 @@ class Action(Authentication):
             for user, pwd in zip(username, password):
                 pwd = self.hashed_password(pwd)
                 cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,pwd,usertype))
-                conn.commit()
-                general_logger.info(f"Successfully Added Users")
+            conn.commit()
+            conn.close()
+            general_logger.info(f"Successfully Added Users")
             return {"state":True,"message":"Successfully Added List Of Users"}
                 
         if isinstance(usertype,tuple):
@@ -216,17 +231,20 @@ class Action(Authentication):
                     usertypeid = usertype[1]
                     cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertypeid))
                     conn.commit()
+                    conn.close()
                     Action.save_json(PERMISSION_FILE,defined_permissions)
                     general_logger.info(f"{usertype[1]} Successfully Added as a Role")
                     return {"state":True,"message":f"Successfully Added User {username} With Role {usertype[1]}"}
             else:
                 if self._dev_mode == True:
+                    general_logger.warning("Invalid tuple format. Use ('custom', 'RoleName').") 
                     raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
                 else:
                     return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
                 
         if usertype not in defined_permissions and not isinstance(usertype,tuple):
             if self._dev_mode == True:
+                general_logger.warning(f"Role {usertype} is not defined.")  
                 raise Undefined(f"Role {usertype} is not defined.")
             else:
                 return {"state":False,"message":f"Role {usertype} is not defined."}
@@ -234,17 +252,27 @@ class Action(Authentication):
         passwords = self.hashed_password(password)
         cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,passwords,usertypeid))
         conn.commit()
-
+        conn.close()
+        general_logger.info(f"Successfully Added User {username}")
+        return {"state":True,"message":f"Successfully Added User {username}"}
         
 
     def remove_user(self,remove_ans):
-        userdata = load_json(USERDATA_FILE)
+        conn = connect_db()
+        cursor = conn.cursor()
+
+
         if not self._dev_mode:
             perm = "remove_user"
             self.verifypermissions(perm)
-        if remove_ans in userdata:
-            userdata.pop(remove_ans)
-            Action.save_json(USERDATA_FILE, userdata)
+
+        cursor.execute("SELECT * FROM data WHERE username = ?",(remove_ans,))
+        data = cursor.fetchone()
+        if data is not None:
+            cursor.execute("DELETE FROM data WHERE username = ?",(remove_ans,))
+            conn.commit()
+            conn.close()
+            
             general_logger.info(f"{remove_ans} Removed Successfully")
             return True
         else:
@@ -260,6 +288,7 @@ class Action(Authentication):
             json.dump(data,f, indent=4)
     
     def view_userinfo(self,toview):
+        name = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
         conn = connect_db()
         cursor = conn.cursor()
         
@@ -275,7 +304,7 @@ class Action(Authentication):
         if toview not in names and toview.lower() != "all":
             return {"state":False,"message":f"{toview} Does Not Exist!"}
         if toview in names:
-            name = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
+            
             general_logger.info(f"{name['Username']} requested to view {toview}")
             cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
             data = cursor.fetchone()
@@ -283,77 +312,68 @@ class Action(Authentication):
             conn.close()
             return namedata
         elif toview.lower() == "all":
-            general_logger.info(f"{self.local_data.token['Username']} requested to view all users")
-            return userdata
+            cursor.execute("SELECT username, role FROM data")
+            allusers = cursor.fetchall()
+            return allusers
         else:
+            general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
             if self._dev_mode == True:
-                general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
                 raise UsernameNotFound("Username Name Not Found")
             else:
-                general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
                 return f"{toview} Does Not Exist!"
         
     def verifypermissions(self,perm):
         decoded = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
-        allowed_permissions = decoded.get("Permission",[])
+        allowed_permissions = decoded["Permission"]
         if perm in allowed_permissions:
-               return 
-        else:
-            if self._dev_mode == True:
-                general_logger.info(f"Permission Not Allowed For {self.role}")
-                raise PermissionDenied("info", f"Permission Not Allowed For {self.role}")
-            else:
-                general_logger.info(f"Permission Not Allowed For {self.role}")
-                return {"state":False,"message":f"Permission Not Allowed For {self.role}"}
-    
-    def custom_permission(self,permnission_name):
-        if not self._dev_mode:
-            perm = "custom_permission"
-            self.verifypermissions(perm)
-
-        if not callable(permnission_name):
-            if self._dev_mode == True:
-                general_logger.warning(f"{permnission_name} Not Found Please Define Function")
-                raise NotFound(f"{permnission_name}  Not Found Please Define Function")
-            else:
-                return {"state":False,"Message":f"{permnission_name}  Not Found Please Define Function"}
-            
-        func_name = permnission_name.__name__
-
-        if func_name not in self.custom_function:
-            self.custom_function.append(permnission_name)
-            general_logger.info(f"Successfully Added {permnission_name} as a custom permission")
             return True
-        elif self._dev_mode == True:
-            general_logger.warning("Permission already exists")
-            raise AlreadyExist(f"{func_name} Already Exist")
         else:
-            return {"state":False,"message":"Permission Already Exist"}
+            return False
 
-    def bind(self,add_to,permname):
+    def bind(self,add_to,permission_name):
         defined_permissions = load_json(PERMISSION_FILE)
+        
         if not self._dev_mode:
             perm = "bind"
             self.verifypermissions(perm)
 
-        if permname in self.custom_function:
-            if add_to in defined_permissions:
-                if permname not in defined_permissions[add_to]:
-                        defined_permissions[add_to].append(permname)
-                        self.save_json(PERMISSION_FILE, defined_permissions)
-                        general_logger.info(f"Permission '{permname}' added to role '{add_to}'.")
-                        return True
+        permission_func = globals().get(permission_name)
+        if not callable(permission_func):
+            if self._dev_mode == True:
+                general_logger.warning(f"{permission_name} Not Found Please Define Function")
+                raise NotFound(f"{permission_name}  Not Found Please Define Function")
             else:
-                general_logger.warning(f"{add_to} is not a defined role")
-                return {"state":False,"message":f"{add_to} is not a defined role"}
-        else:
-            return {"state":False,"message":f"{permname}is not a custom function, please add it to custom functions"}
+                return {"state":False,"Message":f"{permission_name}  Not Found Please Define Function"}
+            
+        if add_to not in defined_permissions:
+            if self._dev_mode == True:
+                general_logger.warning(f"Role {add_to} Not Found")
+                raise NotFound(f"Role {add_to} Not Found")
+            else:
+                general_logger.warning(f"Role {add_to} Not Found")
+                return {"state":False,"message":f"Role {add_to} Not Found"} 
+
+
+        if permission_name not in defined_permissions[add_to]:
+            defined_permissions[add_to].append(permission_name)
+            self.save_json(PERMISSION_FILE, defined_permissions)
+            general_logger.info(f"Permission '{permission_name}' added to role '{add_to}'.")
+            return True
+        else: 
+            if self._dev_mode == True:
+                general_logger.warning(f"Permission {permission_name} Already Exists")
+                raise AlreadyExist(f"Permission {permission_name} Already Exists")
+            else:
+                return {"state":False,"message":f"Permission {permission_name} Already Exists"}
             
     def execute(self,permission_name):
         if not self._dev_mode:
             perm = "execute"
             self.verifypermissions(perm)
-        if permission_name not in self.custom_function:
+
+        defined_permissions = load_json(PERMISSION_FILE)
+        permissions = [perm for perms in defined_permissions.values() for perm in perms]
+        if permission_name not in permissions:
             if self._dev_mode == True:
                 general_logger.warning(f"{permission_name} is not a function")
                 raise NotFound("Function Not Found")
@@ -368,4 +388,6 @@ class Action(Authentication):
 instance = Action(_dev_mode = True)
 instance.login("darell","1234")
 
-print(instance.view_userinfo("da"))
+print(instance.add_user("ric","llyod"))
+# print(instance.view_userinfo("darell"))
+
