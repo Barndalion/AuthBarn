@@ -110,35 +110,36 @@ class Authentication():
             return True
 
     def reset_password(self,username,new_password):
-        conn = connect_db()
-        cursor = conn.cursor()
+        with connect_db() as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT username FROM data")
-        data = cursor.fetchall()
-        names = {name[0] for name in data}
-        if username not in names:
-            general_logger.warning("Username Not Found")
-            if self._dev_mode == True:
-                raise NotFound(f"Username {username} Not Found")
-            else:              
-                return {"state":False,"message":"Username Not Found"}
-        
-        cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
-        userdata = cursor.fetchone()
-        old_password = userdata[2].encode()       
-        
-        if self.verify_password(new_password,old_password):
-            general_logger.warning("New Password Cant Be The Same As Old Password")
-            if self._dev_mode == True:
-                raise AlreadyExist("New Password Cant Be The Same As Old Password")
-            else:
-                return {"state":False,"message":"New Password Cant Be The Same As Old Password"}
+            cursor.execute("SELECT username FROM data")
+            data = cursor.fetchall()
+            names = {name[0] for name in data}
+            if username not in names:
+                general_logger.warning("Username Not Found")
+                if self._dev_mode == True:
+                    raise NotFound(f"Username {username} Not Found")
+                else:              
+                    return {"state":False,"message":"Username Not Found"}
             
-        password = self.hashed_password(new_password)
-        cursor.execute("UPDATE data SET password = ? WHERE username = ?",(password,username))
-        conn.commit()
-        conn.close()
-        return True
+            cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
+            userdata = cursor.fetchone()
+            old_password = userdata[2].encode()       
+            
+            if self.verify_password(new_password,old_password):
+                general_logger.warning("New Password Cant Be The Same As Old Password")
+                if self._dev_mode == True:
+                    raise AlreadyExist("New Password Cant Be The Same As Old Password")
+                else:
+                    return {"state":False,"message":"New Password Cant Be The Same As Old Password"}
+                
+            password = self.hashed_password(new_password)
+            cursor.execute("UPDATE data SET password = ? WHERE username = ?",(password,username))
+            general_logger.info("Password Reset Successful")
+            conn.commit()
+            
+            return True
 
 class Action(Authentication):
     def __init__(self,enable_logging=False,_dev_mode=False):
@@ -198,96 +199,98 @@ class Action(Authentication):
                 general_logger.warning(f"Permission Denied")
                 return {"state":False,"message":f"Permission Denied"}
             
-        conn = connect_db()
-        cursor = conn.cursor()
-        usertypeid = usertype
+        with connect_db() as conn:
+            cursor = conn.cursor()
+            usertypeid = usertype
 
-        cursor.execute("SELECT username FROM data")
-        name = cursor.fetchall()
-        names = {names[0] for names in name}
-
-        if username in names:
-            general_logger.warning(f"{username} Already Exists")
-            if self._dev_mode == True:
-                raise AlreadyExist(f"{username} Already Exists")
-            else:
-                return {"state":False,"message":f"{username} Already Exists"}
-
-        if isinstance(username, list) and isinstance(password, list):
-            if len(username) != len(password):
-                general_logger.warning("Lists for bulk user creation must be of the same length.")
+            cursor.execute("SELECT username FROM data")
+            names = {name for name in cursor.fetchall()}
+         
+            if username in names:
+                general_logger.warning(f"{username} Already Exists")
                 if self._dev_mode == True:
-                    raise Undefined("Lists for bulk user creation must be of the same length.")
+                    raise AlreadyExist(f"{username} Already Exists")
                 else:
-                    return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
+                    return {"state":False,"message":f"{username} Already Exists"}
+
+            if isinstance(username, list) and isinstance(password, list):
+                if len(username) != len(password):
+                    general_logger.warning("Lists for bulk user creation must be of the same length.")
+                    if self._dev_mode:
+                        raise Undefined("Lists for bulk user creation must be of the same length.")
+                    else:
+                        return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
+            
+                for user, pwd in zip(username, password):
+                    if user in names:
+                        general_logger.warning(f"{user} Already Exists")
+                        continue
+                    hashed_pwd = self.hashed_password(pwd)
+                    cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,hashed_pwd,usertype))
+                conn.commit()
+                general_logger.info(f"Successfully Added Users")
+                return {"state":True,"message":"Successfully Added List Of Users"}
+            
+            if username in names:
+                general_logger.warning(f"{username} Already Exists")
+                if self._dev_mode == True:
+                    raise AlreadyExist(f"{username} Already Exists")
+                else:
+                    return {"state":False,"message":f"{username} Already Exists"}
+                    
+            if isinstance(usertype,tuple):
+                if usertype[0].lower()=='custom':
+                        defined_permissions[usertype[1]] = []
+                        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertypeid))
+                        conn.commit()
+                        Action.save_json(PERMISSION_FILE,defined_permissions)
+                        general_logger.info(f"{usertype[1]} Successfully Added as a Role")
+                        return {"state":True,"message":f"Successfully Added User {username} With Role {usertype[1]}"}
+                else:
+                    if self._dev_mode == True:
+                        general_logger.warning("Invalid tuple format. Use ('custom', 'RoleName').") 
+                        raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
+                    else:
+                        return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
+                    
+            if usertype not in defined_permissions:
+                if self._dev_mode == True:
+                    general_logger.warning(f"Role {usertype} is not defined.")  
+                    raise Undefined(f"Role {usertype} is not defined.")
+                else:
+                    return {"state":False,"message":f"Role {usertype} is not defined."}
         
-            for user, pwd in zip(username, password):
-                pwd = self.hashed_password(pwd)
-                cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,pwd,usertype))
+            hashed_password = self.hashed_password(password)
+            cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,hashed_password,usertypeid))
             conn.commit()
-            conn.close()
-            general_logger.info(f"Successfully Added Users")
-            return {"state":True,"message":"Successfully Added List Of Users"}
-                
-        if isinstance(usertype,tuple):
-            if usertype[0].lower()=='custom':
-                    defined_permissions[usertype[1]] = []
-                    usertypeid = usertype[1]
-                    cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,password,usertypeid))
-                    conn.commit()
-                    conn.close()
-                    Action.save_json(PERMISSION_FILE,defined_permissions)
-                    general_logger.info(f"{usertype[1]} Successfully Added as a Role")
-                    return {"state":True,"message":f"Successfully Added User {username} With Role {usertype[1]}"}
-            else:
-                if self._dev_mode == True:
-                    general_logger.warning("Invalid tuple format. Use ('custom', 'RoleName').") 
-                    raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
-                else:
-                    return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
-                
-        if usertype not in defined_permissions and not isinstance(usertype,tuple):
-            if self._dev_mode == True:
-                general_logger.warning(f"Role {usertype} is not defined.")  
-                raise Undefined(f"Role {usertype} is not defined.")
-            else:
-                return {"state":False,"message":f"Role {usertype} is not defined."}
-       
-        passwords = self.hashed_password(password)
-        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,passwords,usertypeid))
-        conn.commit()
-        conn.close()
-        general_logger.info(f"Successfully Added User {username}")
-        return {"state":True,"message":f"Successfully Added User {username}"}
+            general_logger.info(f"Successfully Added User {username}")
+            return {"state":True,"message":f"Successfully Added User {username}"}
         
 
     def remove_user(self,remove_ans):
-        conn = connect_db()
-        cursor = conn.cursor()
-
-
         if self._dev_mode:
             perm = "remove_user"
             general_logger.info(f"Permission: {perm}")
             if self.verifypermissions(perm) == False:
                 general_logger.warning(f"Permission Denied")
                 return {"state":False,"message":f"Permission Denied"}
-
-        cursor.execute("SELECT * FROM data WHERE username = ?",(remove_ans,))
-        data = cursor.fetchone()
-        if data is not None:
-            cursor.execute("DELETE FROM data WHERE username = ?",(remove_ans,))
-            conn.commit()
-            conn.close()
             
-            general_logger.info(f"{remove_ans} Removed Successfully")
-            return True
-        else:
-            general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
-            if self._dev_mode == True:
-                raise UsernameNotFound(f"Username {remove_ans} Not Found")
+        with connect_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM data WHERE username = ?",(remove_ans,))
+            data = cursor.fetchone()
+            if data is not None:
+                cursor.execute("DELETE FROM data WHERE username = ?",(remove_ans,))
+                conn.commit()
+                
+                general_logger.info(f"{remove_ans} Removed Successfully")
+                return True
             else:
-                return {"state":False,"message":f"NO RECORDS NAMED {remove_ans}"}
+                general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
+                if self._dev_mode == True:
+                    raise UsernameNotFound(f"Username {remove_ans} Not Found")
+                else:
+                    return {"state":False,"message":f"NO RECORDS NAMED {remove_ans}"}
     @staticmethod
     def save_json(filepath,data):
         with open(filepath, 'w') as f:
@@ -302,39 +305,38 @@ class Action(Authentication):
                 return {"state":False,"message":f"Permission Denied"}
             
         name = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
-        conn = connect_db()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT Username FROM data")
-        userdata = cursor.fetchall()
+        with connect_db() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT Username FROM data")
+            userdata = cursor.fetchall()
 
-        names = {names[0] for names in userdata}
+            names = {names[0] for names in userdata}
 
-        if not self._dev_mode:
-            perm = "view_userinfo"
-            self.verifypermissions(perm)
+            if not self._dev_mode:
+                perm = "view_userinfo"
+                self.verifypermissions(perm)
 
-        if toview not in names and toview.lower() != "all":
-            general_logger.warning(f"{toview} Does Not Exist!")
-            return {"state":False,"message":f"{toview} Does Not Exist!"}
-        if toview in names:
-            general_logger.info(f"{name['Username']} requested to view {toview}")
-            cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
-            data = cursor.fetchone()
-            namedata = {"Username":data[1],"Password":data[2],"Role":data[3]}
-            conn.close()
-            return namedata
-        elif toview.lower() == "all":
-            general_logger.info(f"{name['Username']} requested to view all users")
-            cursor.execute("SELECT username, role FROM data")
-            allusers = cursor.fetchall()
-            return allusers
-        else:
-            general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
-            if self._dev_mode == True:
-                raise UsernameNotFound("Username Name Not Found")
+            if toview not in names and toview.lower() != "all":
+                general_logger.warning(f"{toview} Does Not Exist!")
+                return {"state":False,"message":f"{toview} Does Not Exist!"}
+            if toview in names:
+                general_logger.info(f"{name['Username']} requested to view {toview}")
+                cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
+                data = cursor.fetchone()
+                namedata = {"Username":data[1],"Password":data[2],"Role":data[3]}
+                return namedata
+            elif toview.lower() == "all":
+                general_logger.info(f"{name['Username']} requested to view all users")
+                cursor.execute("SELECT username, role FROM data")
+                allusers = cursor.fetchall()
+                return allusers
             else:
-                return f"{toview} Does Not Exist!"
+                general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
+                if self._dev_mode == True:
+                    raise UsernameNotFound("Username Name Not Found")
+                else:
+                    return f"{toview} Does Not Exist!"
         
     def verifypermissions(self,perm):
         decoded = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
@@ -400,9 +402,3 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
-instance = Action(_dev_mode = True)
-instance.register("lionel","1234")
-
-
-# print(instance.view_userinfo("darell"))
-
