@@ -19,15 +19,16 @@ def connect_db():
     return sqlite3.connect(USERDATA_FILE)
 
 def setup_db1():
-    con = connect_db()
-    cursor = con.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS data("
-    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-    "username TEXT NOT NULL,"
-    "password TEXT NOT NULL,"
-    "role TEXT NOT NULL)")
-    con.commit()
-    con.close()
+
+    with connect_db() as con:
+        cursor = con.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS data("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "username TEXT NOT NULL,"
+        "password TEXT NOT NULL,"
+        "role TEXT NOT NULL)")
+        con.commit()
+    
 
 def ensure_json_exists(filepath,default):
     if not os.path.exists(filepath):

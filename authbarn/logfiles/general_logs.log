@@ -1,12 +1,8 @@
-2025-03-23 00:37:16,642 - INFO - Login Successful
-2025-03-23 00:37:50,256 - INFO - Login Successful
-2025-03-23 00:41:02,812 - INFO - Login Successful
-2025-03-23 00:46:40,096 - INFO - Login Successful
-2025-03-23 00:46:40,097 - WARNING - ric Already Exists
-2025-03-23 00:46:51,846 - INFO - Login Successful
-2025-03-23 00:46:52,079 - INFO - Successfully Added User ric
-2025-03-23 00:47:30,316 - INFO - Login Successful
-2025-03-23 00:47:30,549 - INFO - Successfully Added User ric
-2025-03-23 00:48:09,045 - INFO - Login Successful
-2025-03-23 00:48:09,046 - INFO - Permission: add_user
-2025-03-23 00:48:09,047 - WARNING - Permission Denied
+
+2025-03-23 10:50:46,492 - INFO - Successfully Registered
+2025-03-23 10:52:15,334 - WARNING - Name Already Exists
+2025-03-23 10:52:50,250 - INFO - Successfully Registered
+2025-03-23 10:54:57,114 - WARNING - Name Already Exists
+2025-03-23 10:55:15,882 - INFO - Successfully Registered
+2025-03-23 10:57:14,396 - WARNING - Name Already Exists
+2025-03-23 10:57:26,908 - INFO - Successfully Registered
