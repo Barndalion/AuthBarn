@@ -6,3 +6,10 @@
 2025-03-23 10:55:15,882 - INFO - Successfully Registered
 2025-03-23 10:57:14,396 - WARNING - Name Already Exists
 2025-03-23 10:57:26,908 - INFO - Successfully Registered
+2025-03-24 10:51:51,991 - INFO - darell requested to view all users
+2025-03-24 10:52:29,537 - INFO - lionel Removed Successfully
+2025-03-24 10:52:41,377 - WARNING - NO RECORDS NAMED lionel
+2025-03-24 10:53:09,853 - INFO - Permission: add_user
+2025-03-24 10:54:07,044 - INFO - Successfully Added User lionel
+2025-03-24 10:54:07,049 - INFO - lionel Removed Successfully
+2025-03-24 10:54:32,731 - WARNING - lionel Does Not Exist!

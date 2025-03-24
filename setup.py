@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 
 setup(
     name="AuthBarn",  
-    version="0.1.6",
+    version="0.2.0",
     author="Darell Barnes",
     author_email="barndalion@gmail.com",
     description="User authentication and role-based management.",
@@ -19,6 +19,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    install_requires=[], 
+    install_requires=["bcrypt","jwt"], 
     python_requires=">=3.6",
 )
