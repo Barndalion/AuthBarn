@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import json
+from dotenv import load_dotenv
 #getting directory of this script wherevever it is
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 #setting directory of userdata and file
@@ -19,7 +20,6 @@ def connect_db():
     return sqlite3.connect(USERDATA_FILE)
 
 def setup_db1():
-
     with connect_db() as con:
         cursor = con.cursor()
         cursor.execute("CREATE TABLE IF NOT EXISTS data("
@@ -32,9 +32,13 @@ def setup_db1():
 
 def ensure_json_exists(filepath,default):
     if not os.path.exists(filepath):
-        with open("permission.json","w") as f:
+        with open(filepath,"w") as f:
             json.dump(default,f,indent=4)
 
 
-#secret key
-SECRET_KEY = "e4f8b13c7a2e4a9db6d8e5f8b7c2a1d4f3e6c8b9a0d7e5f6c3b2a1f4e7d9c6b8"
+# Load .env file from the same directory as this config
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+SECRET_KEY = os.getenv("AUTHBARN_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("AUTHBARN_SECRET_KEY env var not set")

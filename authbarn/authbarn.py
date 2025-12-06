@@ -4,8 +4,8 @@ import threading
 import bcrypt
 import jwt
 import sqlite3 
-from logger import user_logger,general_logger
-from config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
+from .logger import user_logger,general_logger
+from .config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
 
 class Undefined(Exception):
     pass
@@ -25,14 +25,14 @@ def load_json(filepath):
         return json.load(f)
 default = {"Admin":[]}
 ensure_json_exists(PERMISSION_FILE,default)
-setup_db1()
 
 
 class Authentication():
     def __init__(self,enable_logging=False, dev_mode=False):
        self.dev_mode = dev_mode
        self.enable_logging = enable_logging
-       self.local_data = threading.local()
+       setup_db1()
+
 
     def log(self,level,message):
         if self.enable_logging:
@@ -81,7 +81,6 @@ class Authentication():
                 general_logger.info("Login Successful")
                 role = data[3]
                 token = self.generate_token(data[1],role)
-                self.local_data.token = token
                 return {"state":True,"token":token}
             else:
                 general_logger.critical("Incorrect Username or Password!")
@@ -125,7 +124,7 @@ class Authentication():
             
             cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
             userdata = cursor.fetchone()
-            old_password = userdata[2].encode()       
+            old_password = userdata[2]      
             
             if self.verify_password(new_password,old_password):
                 general_logger.warning("New Password Cant Be The Same As Old Password")
@@ -146,7 +145,7 @@ class Action(Authentication):
         super().__init__(enable_logging,dev_mode) 
         
     def add_role(self,new_role, permissions):
-        if self.dev_mode:
+        if self.dev_mode == False:
             perm = "add_role"
             general_logger.info(f"Permission: {perm}")
             if self.verifypermissions(perm) == False:
@@ -170,7 +169,7 @@ class Action(Authentication):
     def remove_role(self,role_to_remove):
         defined_permissions = load_json(PERMISSION_FILE)    
 
-        if self.dev_mode:
+        if self.dev_mode == False:
             perm = "remove_role"
             general_logger.info(f"Permission: {perm}")
             if self.verifypermissions(perm) == False:
@@ -202,7 +201,7 @@ class Action(Authentication):
         with connect_db() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT username FROM data")
-            names = {name for name in cursor.fetchall()}
+            names = {name[1] for name in cursor.fetchall()}
          
             if username in names:
                 general_logger.warning(f"{username} Already Exists")
@@ -289,7 +288,7 @@ class Action(Authentication):
         with open(filepath, 'w') as f:
             json.dump(data,f, indent=4)
     
-    def view_userinfo(self,toview):
+    def view_userinfo(self,token,toview):
         if self.dev_mode ==  False:
             perm = "view_userinfo"
             general_logger.info(f"Permission: {perm}")
@@ -297,8 +296,7 @@ class Action(Authentication):
                 general_logger.warning(f"Permission Denied")
                 return {"state":False,"message":f"Permission Denied"}
             
-        # name = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
-        name = {"Username":"darell"}
+        name = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         with connect_db() as conn:
             cursor = conn.cursor()
             
@@ -328,8 +326,8 @@ class Action(Authentication):
                 else:
                     return f"{toview} Does Not Exist!"
         
-    def verifypermissions(self,perm):
-        decoded = jwt.decode(self.local_data.token, SECRET_KEY, algorithms=["HS256"])
+    def verifypermissions(self,perm,token):
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         allowed_permissions = decoded["Permission"]
         if perm in allowed_permissions:
             return True
@@ -398,7 +396,3 @@ class Action(Authentication):
             general_logger.info(f"successfully Executed {permission_name}")
             func()
             return True
-        
-instance = Action(dev_mode=True)
-# instance.add_user("lionel","1234")
-print(instance.view_userinfo("lionel"))

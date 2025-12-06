@@ -11,9 +11,5 @@
         "print_name"
     ],
     "User": [
-        "EXECUTE",
-        "buy"
-    ],
-    "detainee": [],
-    "sumn": []
+    ]
 }
