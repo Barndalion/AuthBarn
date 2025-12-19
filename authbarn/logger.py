@@ -1,5 +1,5 @@
 import logging
-from config import GENERAL_INFO_FILE,USERS_LOG_FILE
+from .config import GENERAL_INFO_FILE,USERS_LOG_FILE
 logging.basicConfig(level=logging.DEBUG, filename= GENERAL_INFO_FILE,filemode='a',format="%(asctime)s - %(levelname)s - %(message)s")
 
 general_logger = logging.getLogger(__name__)

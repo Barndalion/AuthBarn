@@ -2,8 +2,8 @@ import json
 import os
 import bcrypt
 import jwt
-from logger import user_logger,general_logger
-from config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
+from .logger import user_logger,general_logger
+from .config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
 from contextlib import closing
 import mysql.connector
 
