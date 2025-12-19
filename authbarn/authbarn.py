@@ -1,11 +1,11 @@
 import json
 import os
-import threading
 import bcrypt
 import jwt
-import sqlite3 
-from .logger import user_logger,general_logger
-from .config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
+from logger import user_logger,general_logger
+from config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
+from contextlib import closing
+import mysql.connector
 
 class Undefined(Exception):
     pass
@@ -28,10 +28,11 @@ ensure_json_exists(PERMISSION_FILE,default)
 
 
 class Authentication():
-    def __init__(self,enable_logging=False, dev_mode=False):
+    def __init__(self,enable_logging=False, dev_mode=False,credentials=[]):
        self.dev_mode = dev_mode
        self.enable_logging = enable_logging
-       setup_db1()
+       self.credentials = credentials
+       setup_db1(credentials=self.credentials)
 
 
     def log(self,level,message):
@@ -44,10 +45,14 @@ class Authentication():
                 user_logger.critical(message)
 
     def hashed_password(self,password):
+        password = str(password)
         salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode(), salt)
+        hashed = bcrypt.hashpw(password.encode(), salt)
+        return hashed.decode('utf-8')
 
     def verify_password(self,enter_password, stored_password):
+        if isinstance(stored_password,str):
+            stored_password = stored_password.encode('utf-8')
         return bcrypt.checkpw(enter_password.encode(),stored_password)
     
     def generate_token(self,username,role):
@@ -62,10 +67,10 @@ class Authentication():
         return token
    
     def login(self,username,password):
-        with connect_db() as conn:
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
     
-            cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
+            cursor.execute("SELECT * FROM data WHERE username = %s",(username,))
             data = cursor.fetchone()
             
 
@@ -76,11 +81,11 @@ class Authentication():
                 else:
                     return {"state":False, "message":"Username not found"}
             
-            stored_password = data[2]
+            stored_password = data[1]
             if self.verify_password(password,stored_password):
                 general_logger.info("Login Successful")
-                role = data[3]
-                token = self.generate_token(data[1],role)
+                role = data[2]
+                token = self.generate_token(data[0],role)
                 return {"state":True,"token":token}
             else:
                 general_logger.critical("Incorrect Username or Password!")
@@ -90,10 +95,10 @@ class Authentication():
                     return {"state":False,"message":"Incorrect Username or Password!"}
         
     def register(self,name,password):
-        with connect_db() as conn:
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor  = conn.cursor()
             
-            cursor.execute("SELECT * FROM data WHERE username = ?",(name,))
+            cursor.execute("SELECT * FROM data WHERE username = %s",(name,))
             data = cursor.fetchone()
             if data != None:
                 general_logger.warning("Name Already Exists")
@@ -104,17 +109,18 @@ class Authentication():
             
             hashing_password = self.hashed_password(password)
             general_logger.info("Successfully Registered")
-            cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(name,hashing_password,"User"))
+            cursor.execute("INSERT INTO data (username,password,role) VALUES (%s,%s,%s)",(name,hashing_password,"User"))
             conn.commit()
-            return True
+
+            token = self.generate_token(name,"User")
+            return {"state":True,"Token":token}
 
     def reset_password(self,username,new_password):
-        with connect_db() as conn:
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
 
             cursor.execute("SELECT username FROM data")
-            data = cursor.fetchall()
-            names = {name[0] for name in data}
+            names = {name[0] for name in cursor.fetchall()}
             if username not in names:
                 general_logger.warning("Username Not Found")
                 if self.dev_mode == True:
@@ -122,9 +128,9 @@ class Authentication():
                 else:              
                     return {"state":False,"message":"Username Not Found"}
             
-            cursor.execute("SELECT * FROM data WHERE username = ?",(username,))
+            cursor.execute("SELECT * FROM data WHERE username = %s",(username,))
             userdata = cursor.fetchone()
-            old_password = userdata[2]      
+            old_password = userdata[1]      
             
             if self.verify_password(new_password,old_password):
                 general_logger.warning("New Password Cant Be The Same As Old Password")
@@ -134,28 +140,31 @@ class Authentication():
                     return {"state":False,"message":"New Password Cant Be The Same As Old Password"}
                 
             password = self.hashed_password(new_password)
-            cursor.execute("UPDATE data SET password = ? WHERE username = ?",(password,username))
+            cursor.execute("UPDATE data SET password = %s WHERE username = %s",(password,username))
             general_logger.info("Password Reset Successful")
             conn.commit()
             
-            return True
+            return {"state":True,"message":"Resset Password Successful"}
 
 class Action(Authentication):
-    def __init__(self,enable_logging=False,dev_mode=False):
-        super().__init__(enable_logging,dev_mode) 
+    def __init__(self,enable_logging=False,dev_mode=False,credentials=[]):
+        super().__init__(enable_logging,dev_mode,credentials)
+        self.credentials = credentials 
+
         
-    def add_role(self,new_role, permissions):
+    def add_role(self,new_role, permissions,token = None):
         if self.dev_mode == False:
             perm = "add_role"
-            general_logger.info(f"Permission: {perm}")
-            if self.verifypermissions(perm) == False:
-                general_logger.warning(f"Permission Denied")
+            if not self.verifypermissions(perm,token):
                 return {"state":False,"message":f"Permission Denied"}
             
         defined_permissions = load_json(PERMISSION_FILE)
 
         if new_role not in defined_permissions:
-            defined_permissions[new_role] = permissions if permissions else []
+            if isinstance(permissions,list):
+                defined_permissions[new_role] = permissions
+            else:
+                defined_permissions[new_role] = [permissions if permissions else []]
             general_logger.info(f"Added Role: {new_role}")
             Action.save_json(PERMISSION_FILE,defined_permissions)
             return True
@@ -166,14 +175,12 @@ class Action(Authentication):
             general_logger.warning("Role Already Exists")
             return {"state":False,"message":"Role Already Exist"}
        
-    def remove_role(self,role_to_remove):
+    def remove_role(self,role_to_remove,token=None):
         defined_permissions = load_json(PERMISSION_FILE)    
 
         if self.dev_mode == False:
             perm = "remove_role"
-            general_logger.info(f"Permission: {perm}")
-            if self.verifypermissions(perm) == False:
-                general_logger.warning(f"Permission Denied")
+            if not self.verifypermissions(perm,token):
                 return {"state":False,"message":f"Permission Denied"}
             
         if role_to_remove in defined_permissions:
@@ -188,95 +195,75 @@ class Action(Authentication):
             general_logger.info(f"No Role Called: {role_to_remove}")
             return {"state":False,"message":f"No Role Called {role_to_remove}"}
       
-    def add_user(self,username,password,usertype="User"):
-        defined_permissions = load_json(PERMISSION_FILE)
-
-        if self.dev_mode == False:
+    def add_user(self,username,password,role="User",token=None):
+        
+        if not self.dev_mode:
             perm = "add_user"
-            general_logger.info(f"Permission: {perm}")
-            if self.verifypermissions(perm) == False:
-                general_logger.warning(f"Permission Denied")
-                return {"state":False,"message":f"Permission Denied"}
+            if not self.verifypermissions(perm,token):
+                return {"state":False,"message":"Permission Denied"}
             
-        with connect_db() as conn:
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT username FROM data")
-            names = {name[1] for name in cursor.fetchall()}
-         
+            cursor.execute("SELECT * FROM data WHERE username = %s",(username,))
+            data = cursor.fetchall()
+
+            names = [name[0] for name in data]
+
             if username in names:
-                general_logger.warning(f"{username} Already Exists")
                 if self.dev_mode:
-                    raise AlreadyExist(f"{username} Already Exists")
+                    raise AlreadyExist("User already exists")
                 else:
-                    return {"state":False,"message":f"{username} Already Exists"}
-
-            if isinstance(username, list) and isinstance(password, list):
-                if len(username) != len(password):
-                    general_logger.warning("Lists for bulk user creation must be of the same length.")
-                    if self.dev_mode:
-                        raise Undefined("Lists for bulk user creation must be of the same length.")
-                    else:
-                        return {"state":False,"message":"Lists for bulk user creation must be of the same length."}
+                    return {"state":False,"message":"User already exists"}
             
-                for user, pwd in zip(username, password):
-                    if user in names:
-                        general_logger.warning(f"{user} Already Exists")
-                        continue
-                    hashed_pwd = self.hashed_password(pwd)
-                    cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(user,hashed_pwd,usertype))
-                conn.commit()
-                general_logger.info(f"Successfully Added Users")
-                return {"state":True,"message":"Successfully Added List Of Users"}
-                    
-            if isinstance(usertype,tuple):
-                if usertype[0].lower()=='custom':
-                        defined_permissions[usertype[1]] = []
-                        usertypeid = usertype[1]
-                        hash_password = self.hashed_password(password)
-                        cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,hash_password,usertypeid))
-                        conn.commit()
-                        Action.save_json(PERMISSION_FILE,defined_permissions)
-                        general_logger.info(f"{usertype[1]} Successfully Added as a Role")
-                        return {"state":True,"message":f"Successfully Added User {username} With Role {usertype[1]}"}
-                else:
-                    if self.dev_mode == True:
-                        general_logger.warning("Invalid tuple format. Use ('custom', 'RoleName').") 
-                        raise ValueError("Invalid tuple format. Use ('custom', 'RoleName').")
-                    else:
-                        return {"state":False,"message":"Invalid tuple format. Use ('custom', 'RoleName')."}
-                    
-            if usertype not in defined_permissions:
-                if self.dev_mode == True:
-                    general_logger.warning(f"Role {usertype} is not defined.")  
-                    raise Undefined(f"Role {usertype} is not defined.")
-                else:
-                    return {"state":False,"message":f"Role {usertype} is not defined."}
-        
-            hash_password = self.hashed_password(password)
-            cursor.execute("INSERT INTO data (username,password,role) VALUES (?,?,?)",(username,hash_password,usertype))
+            cursor.execute("INSERT INTO data (username,password,role) VALUES (%s,%s,%s)",(username,self.hashed_password(password),role))
             conn.commit()
-            general_logger.info(f"Successfully Added User {username}")
-            return {"state":True,"message":f"Successfully Added User {username}"}
+            return {"state":True,"message":f"Successfully added {username}"}
         
+    def add_bulk_user(self,username=[],password=[],role="User",token=None):
+        if not self.dev_mode:
+            perm = "add_user"
+            if not self.verifypermissions(perm,token):
+                return {"state":False,"message":"Permission Denied"}
+            
+        if len(username) != len(password):
+            if not self.dev_mode:
+                return {"state":True,"message":"Length of Username and Length of password lists must be the same"}
+            else:
+                raise(IndexError("Length of Username and Length of password lists must be the same"))
+        
+        for nam,pas in zip(username,password):
+            with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM data")
+                data = [names[0] for names in cursor.fetchall()]
 
-    def remove_user(self,remove_ans):
+                if nam in data:
+                    if self.dev_mode:
+                        raise AlreadyExist("User already exists")
+                    else:
+                        return {"state":False,"message":"User already exists"}
+
+                cursor.execute("INSERT INTO data (username,password,role) VALUES (%s,%s,%s)",(nam,self.hashed_password(pas),role))
+                conn.commit()
+        return {"state":True,"message":"Successfully Added Bulk of Users"}
+
+
+    def remove_user(self,remove_ans,token=None):
         if self.dev_mode == False:
             perm = "remove_user"
-            general_logger.info(f"Permission: {perm}")
-            if self.verifypermissions(perm) == False:
-                general_logger.warning(f"Permission Denied")
+            if not self.verifypermissions(perm,token):
                 return {"state":False,"message":f"Permission Denied"}
             
-        with connect_db() as conn:
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM data WHERE username = ?",(remove_ans,))
+            cursor.execute("SELECT * FROM data WHERE username = %s",(remove_ans,))
             data = cursor.fetchone()
  
             if data is not None:
-                cursor.execute("DELETE FROM data WHERE username = ?",(remove_ans,))
+                cursor.execute("DELETE FROM data WHERE username = %s",(remove_ans,))
                 conn.commit()
                 general_logger.info(f"{remove_ans} Removed Successfully")
-                return True
+                return {"state":True,"message":f"REMOVED RECORD NAMED {remove_ans}"}
             else:
                 general_logger.warning(f"NO RECORDS NAMED {remove_ans}")
                 if self.dev_mode:
@@ -288,111 +275,72 @@ class Action(Authentication):
         with open(filepath, 'w') as f:
             json.dump(data,f, indent=4)
     
-    def view_userinfo(self,token,toview):
+    def view_userinfo(self,toview,token=None):
+        name = {"Username":"admin"}
         if self.dev_mode ==  False:
+            name = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             perm = "view_userinfo"
-            general_logger.info(f"Permission: {perm}")
-            if self.verifypermissions(perm) == False:
-                general_logger.warning(f"Permission Denied")
+            if not self.verifypermissions(perm,token):
                 return {"state":False,"message":f"Permission Denied"}
             
-        name = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        with connect_db() as conn:
+        
+        with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
             
             cursor.execute("SELECT Username FROM data")
             userdata = cursor.fetchall()
 
-            names = {names[0] for names in userdata}
+            names = [names[0] for names in userdata]
 
-            if toview not in names and toview.lower() != "all":
-                general_logger.warning(f"{toview} Does Not Exist!")
-                return {"state":False,"message":f"{toview} Does Not Exist!"}
-            if toview in names:
-                general_logger.info(f"{name['Username']} requested to view {toview}")
-                cursor.execute("SELECT * FROM data WHERE username = ?",(toview,))
-                data = cursor.fetchone()
-                namedata = {"Username":data[1],"Role":data[3]}
-                return namedata
-            elif toview.lower() == "all":
-                general_logger.info(f"{name['Username']} requested to view all users")
-                cursor.execute("SELECT username, role FROM data")
-                allusers = cursor.fetchall()
-                return allusers
-            else:
+            if toview not in names:
                 general_logger.warning(f"Function Call: view_userinfo, No User Called {toview} Found")
                 if self.dev_mode == True:
                     raise UsernameNotFound("Username Name Not Found")
                 else:
                     return f"{toview} Does Not Exist!"
-        
-    def verifypermissions(self,perm,token):
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        allowed_permissions = decoded["Permission"]
-        if perm in allowed_permissions:
-            return True
-        else:
-            return False
 
-    def bind(self,add_to,permission_name):
-        defined_permissions = load_json(PERMISSION_FILE)
-        
-        if not self.dev_mode:
-            perm = "bind"
-            self.verifypermissions(perm)
+            elif toview in names:
+                general_logger.info(f"{name['Username']} requested to view {toview}")
+                cursor.execute("SELECT * FROM data WHERE username = %s",(toview,))
+                data = cursor.fetchone()
+                namedata = {"Username":data[0],"Role":data[2]}
+                return namedata
 
-        if permission_name in globals():
-            permission_func = globals().get(permission_name)
-        else:
+            elif toview.lower() == "all":
+                general_logger.info(f"{name['Username']} requested to view all users")
+                cursor.execute("SELECT username, role FROM data")
+                allusers = cursor.fetchall()
+                return allusers
+    
+                
+        
+    def verifypermissions(self, perm, token=None):
+        try:
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            allowed_permissions = decoded["Permission"]
+            if perm in allowed_permissions:
+                general_logger.info(f"Permission '{perm}' verified for user")
+                return True
+            else:
+                general_logger.warning(f"Permission '{perm}' denied")
+                if self.dev_mode:
+                    raise PermissionDenied(f"Permission '{perm}' not granted")
+                return False
+        except jwt.InvalidTokenError as e:
+            general_logger.error(f"Invalid token: {e}")
             if self.dev_mode:
-                raise NotFound("Permission Not Found")
-            else:
-                return {'state':False,'message':'Permission Not Found'}
-            
-        if not callable(permission_func):
-            if self.dev_mode == True:
-                general_logger.warning(f"{permission_name} Not Found Please Define Function")
-                raise NotFound(f"{permission_name}  Not Found Please Define Function")
-            else:
-                general_logger.warning(f"{permission_name} Not Found Please Define Function")
-                return {"state":False,"Message":f"{permission_name}  Not Found Please Define Function"}
-            
-        if add_to not in defined_permissions:
-            general_logger.warning(f"Role {add_to} Not Found")
-            if self.dev_mode == True:  
-                raise NotFound(f"Role {add_to} Not Found")
-            else:
-                return {"state":False,"message":f"Role {add_to} Not Found"} 
+                raise
+            return False
+    @staticmethod
+    def require_permission(role):
+        def wrapper(func):
+            def inner(*args, **kwargs):
+                token = kwargs.get("token") or args[0] # depends on how you pass it
+                decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
 
+                if role != decoded.get("Role"):
+                    raise PermissionDenied("Permission Denied")
 
-        if permission_name not in defined_permissions[add_to]:
-            defined_permissions[add_to].append(permission_name)
-            self.save_json(PERMISSION_FILE, defined_permissions)
-            general_logger.info(f"Permission '{permission_name}' added to role '{add_to}'.")
-            return True
-        else: 
-            general_logger.warning(f"Permission {permission_name} Already Exists")
-            if self.dev_mode == True:
-                raise AlreadyExist(f"Permission {permission_name} Already Exists")
-            else:
-                return {"state":False,"message":f"Permission {permission_name} Already Exists"}
-            
-    def execute(self,permission_name):
-        if not self.dev_mode:
-            perm = "execute"
-            self.verifypermissions(perm)
-
-        defined_permissions = load_json(PERMISSION_FILE)
-        permissions = [perm for perms in defined_permissions.values() for perm in perms]
-        if permission_name not in permissions:
-            if self.dev_mode == True:
-                general_logger.warning(f"{permission_name} is not a function")
-                raise NotFound("Function Not Found")
-            else: 
-                general_logger.warning(f"{permission_name} is not a function")
-                return {"state":False,"message":"Function Not Found"}
-        else:
-            func = globals().get(permission_name)
-            general_logger.info(f"successfully Executed {permission_name}")
-            func()
-            return True
+                return func(*args, **kwargs)
+            return inner
+        return wrapper

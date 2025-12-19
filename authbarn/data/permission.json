@@ -8,8 +8,8 @@
         "custom_permission",
         "bind",
         "execute",
-        "print_name"
+        "print_name",
+        "printing"
     ],
-    "User": [
-    ]
+    "User": ["Prinny"]
 }
