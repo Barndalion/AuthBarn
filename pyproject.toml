@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "AuthBarn"
-version = "0.2.4"
+version = "0.2.8"
 authors = [
     { name="Darell Barnes", email="darellbarnes450@gmail.com" }
 ]
@@ -16,4 +16,4 @@ description = "User authentication and role-based management."
 readme = "README.md"
 requires-python = ">=3.6"
 license = { text = "MIT" }
-dependencies = ["bcrypt","pyjwt"]
+dependencies = ["bcrypt","PyJWT"]

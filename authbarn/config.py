@@ -1,11 +1,12 @@
 import os
-import sqlite3
 import json
 from dotenv import load_dotenv
 import mysql.connector
 from contextlib import closing
+import secrets
+from pathlib import Path
 #getting directory of this script wherevever it is
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
 #setting directory of userdata and file
 USERDATA_DIR = os.path.join(BASE_DIR,"data")
 LOG_DIR = os.path.join(BASE_DIR,"logfiles")
@@ -18,7 +19,7 @@ USERDATA_FILE = os.path.join(USERDATA_DIR,"userdata.db")
 GENERAL_INFO_FILE = os.path.join(LOG_DIR,"general_logs.log")
 USERS_LOG_FILE = os.path.join(LOG_DIR,"user_logs.log")
 #function to test if files exist at path
-
+ENV_PATH = BASE_DIR / ".env"
 
 def connect_db(host, port, user, password, database):
     return mysql.connector.connect(
@@ -46,18 +47,22 @@ def ensure_json_exists(filepath,default):
         with open(filepath,"w") as f:
             json.dump(default,f,indent=4)
 
-
 # Load .env file from the same directory as this config
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+def write_credentials_to_env(host,port,user,password,database_name):
+    with open(ENV_PATH,"w") as f:
+        num_bytes = 32
+        secret_key = secrets.token_hex(num_bytes)
+        f.write(f"AUTHBARN_SECRET_KEY={secret_key}\nDB_HOST={host}\nDB_PORT={port}\nDB_USER={user}\nDB_PASSWORD={password}\nDB_NAME={database_name}")
+
+def get_credentials_from_env():
+    """Load DB credentials from environment variables."""
+    return [
+        os.getenv("DB_HOST", "127.0.0.1"),
+        int(os.getenv("DB_PORT", 3306)),
+        os.getenv("DB_USER"),
+        os.getenv("DB_PASSWORD"),
+        os.getenv("DB_NAME")
+    ]
 
 SECRET_KEY = os.getenv("AUTHBARN_SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("AUTHBARN_SECRET_KEY env var not set")
-
-
-
-credentials = ["127.0.0.1",3306,"root","Lionel12$","test"]
-# with closing(connect_db(credentials[0],credentials[1],credentials[2],credentials[3],credentials[4])) as conn:
-#             cursor = conn.cursor()
-#             cursor.execute("INSERT INTO data (username,password,role) VALUE (%s,%s,%s)",("Darell",1234,"User"))
-#             conn.commit()

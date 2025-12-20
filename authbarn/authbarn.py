@@ -2,10 +2,10 @@ import json
 import os
 import bcrypt
 import jwt
-from .logger import user_logger,general_logger
-from .config import PERMISSION_FILE,SECRET_KEY,connect_db,ensure_json_exists,setup_db1
+from logger import user_logger,general_logger
+from config import *
 from contextlib import closing
-import mysql.connector
+import datetime
 
 class Undefined(Exception):
     pass
@@ -28,12 +28,13 @@ ensure_json_exists(PERMISSION_FILE,default)
 
 
 class Authentication():
-    def __init__(self,enable_logging=False, dev_mode=False,credentials=[]):
+    def __init__(self,enable_logging=False, dev_mode=False):
        self.dev_mode = dev_mode
        self.enable_logging = enable_logging
-       self.credentials = credentials
+       self.credentials = get_credentials_from_env()
+       if not self.credentials or len(self.credentials) != 5:
+            raise ValueError("credentials must be [host, port, user, password, database]")
        setup_db1(credentials=self.credentials)
-
 
     def log(self,level,message):
         if self.enable_logging:
@@ -61,7 +62,8 @@ class Authentication():
         payload = {
             "Username":username,
             "Role":role,
-            "Permission": permission
+            "Permission": permission,
+            "Session": datetime.datetime.now() + datetime.timedelta(hours=24)
         }
         token = jwt.encode(payload,SECRET_KEY,algorithm="HS256")
         return token
@@ -147,9 +149,9 @@ class Authentication():
             return {"state":True,"message":"Resset Password Successful"}
 
 class Action(Authentication):
-    def __init__(self,enable_logging=False,dev_mode=False,credentials=[]):
-        super().__init__(enable_logging,dev_mode,credentials)
-        self.credentials = credentials 
+    def __init__(self,enable_logging=False,dev_mode=False,):
+        super().__init__(enable_logging,dev_mode)
+        self.credentials = get_credentials_from_env()
 
         
     def add_role(self,new_role, permissions,token = None):
@@ -310,9 +312,7 @@ class Action(Authentication):
                 general_logger.info(f"{name['Username']} requested to view all users")
                 cursor.execute("SELECT username, role FROM data")
                 allusers = cursor.fetchall()
-                return allusers
-    
-                
+                return allusers             
         
     def verifypermissions(self, perm, token=None):
         try:

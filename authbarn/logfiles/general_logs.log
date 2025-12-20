@@ -37,3 +37,5 @@
 2025-12-12 12:25:06,463 - WARNING - prinny is not a valid function
 2025-12-19 15:21:49,255 - INFO - Successfully Registered
 2025-12-19 15:22:40,797 - INFO - Login Successful
+2025-12-20 13:53:09,416 - CRITICAL - Incorrect Username or Password!
+2025-12-20 14:00:29,010 - CRITICAL - Incorrect Username or Password!
