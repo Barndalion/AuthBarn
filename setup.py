@@ -19,6 +19,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    install_requires=["bcrypt","PyJWT"], 
+    install_requires=["bcrypt", "PyJWT", "mysql-connector-python", "python-dotenv"], 
     python_requires=">=3.6",
 )

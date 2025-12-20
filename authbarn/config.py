@@ -66,3 +66,8 @@ def get_credentials_from_env():
     ]
 
 SECRET_KEY = os.getenv("AUTHBARN_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "AUTHBARN_SECRET_KEY not found in environment variables. "
+        "Please run write_credentials_to_env() or create a .env file."
+    )

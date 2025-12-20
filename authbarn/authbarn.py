@@ -2,10 +2,10 @@ import json
 import os
 import bcrypt
 import jwt
-from logger import user_logger,general_logger
-from config import *
+from .logger import user_logger,general_logger
+from .config import *
 from contextlib import closing
-import datetime
+import time
 
 class Undefined(Exception):
     pass
@@ -63,7 +63,7 @@ class Authentication():
             "Username":username,
             "Role":role,
             "Permission": permission,
-            "Session": datetime.datetime.now() + datetime.timedelta(hours=24)
+            "Session": int(time.time()) + (24 * 3600)
         }
         token = jwt.encode(payload,SECRET_KEY,algorithm="HS256")
         return token
@@ -75,7 +75,6 @@ class Authentication():
             cursor.execute("SELECT * FROM data WHERE username = %s",(username,))
             data = cursor.fetchone()
             
-
             if data is None:
                 general_logger.warning("Username not found")
                 if self.dev_mode:
@@ -151,8 +150,6 @@ class Authentication():
 class Action(Authentication):
     def __init__(self,enable_logging=False,dev_mode=False,):
         super().__init__(enable_logging,dev_mode)
-        self.credentials = get_credentials_from_env()
-
         
     def add_role(self,new_role, permissions,token = None):
         if self.dev_mode == False:
@@ -272,6 +269,7 @@ class Action(Authentication):
                     raise UsernameNotFound(f"Username {remove_ans} Not Found")
                 else:
                     return {"state":False,"message":f"NO RECORDS NAMED {remove_ans}"}
+                
     @staticmethod
     def save_json(filepath,data):
         with open(filepath, 'w') as f:
@@ -285,7 +283,6 @@ class Action(Authentication):
             if not self.verifypermissions(perm,token):
                 return {"state":False,"message":f"Permission Denied"}
             
-        
         with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
             
