@@ -26,7 +26,6 @@ def load_json(filepath):
 default = {"Admin":[]}
 ensure_json_exists(PERMISSION_FILE,default)
 
-
 class Authentication():
     def __init__(self,enable_logging=False, dev_mode=False):
        self.dev_mode = dev_mode
@@ -288,7 +287,6 @@ class Action(Authentication):
             
             cursor.execute("SELECT Username FROM data")
             userdata = cursor.fetchall()
-
             names = [names[0] for names in userdata]
 
             if toview not in names:
@@ -328,6 +326,7 @@ class Action(Authentication):
             if self.dev_mode:
                 raise
             return False
+        
     @staticmethod
     def require_permission(role):
         def wrapper(func):
