@@ -615,7 +615,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For issues, questions, or contributions:
-- **Email:** barndalion@gmail.com
+- **Email:** darellbarnes450@gmail.com
 - **GitHub:** [https://github.com/Barndalion/AuthBarn](https://github.com/Barndalion/AuthBarn)
 
 ---

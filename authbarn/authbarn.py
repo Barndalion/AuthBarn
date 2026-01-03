@@ -6,7 +6,7 @@ from .logger import user_logger,general_logger
 from .config import *
 from contextlib import closing
 import time
-
+from functools import wraps
 class Undefined(Exception):
     pass
 class UsernameNotFound(Exception):
@@ -21,6 +21,14 @@ class PermissionDenied(Exception):
     pass
 
 def load_json(filepath):
+    """Loads JSON data from a file.
+
+    Args:
+        filepath (str): The path to the JSON file.
+
+    Returns:
+        dict: The loaded JSON data.
+    """
     with open(filepath, 'r') as f:
         return json.load(f)
 default = {"Admin":[]}
@@ -28,46 +36,91 @@ ensure_json_exists(PERMISSION_FILE,default)
 
 class Authentication():
     def __init__(self,enable_logging=False, dev_mode=False):
-       self.dev_mode = dev_mode
-       self.enable_logging = enable_logging
-       self.credentials = get_credentials_from_env()
-       if not self.credentials or len(self.credentials) != 5:
+        self.dev_mode = dev_mode
+        self.enable_logging = enable_logging
+        self.credentials = get_credentials_from_env()
+        if not self.credentials or len(self.credentials) != 5:
             raise ValueError("credentials must be [host, port, user, password, database]")
-       setup_db1(credentials=self.credentials)
+        # setup_db1(credentials=self.credentials)
 
     def log(self,level,message):
+        """
+        The Log function is used to log any message to a user log file within the module
+        
+        Args:
+
+            level: There are 3 levels, info, warning and critical
+            message: this is a string custom message you can add
+
+        Example:
+            test.log("info","This will be logged in user_logs")
+        """
         if self.enable_logging:
-            if level == "info":
+            if level.lower() == "info":
                 user_logger.info(message)
-            elif level == "warning":
+            elif level.lower() == "warning":
                 user_logger.warning(message) 
-            elif level == "critical":
+            elif level.lower() == "critical":
                 user_logger.critical(message)
 
     def hashed_password(self,password):
+        """
+        An internal function used to hash a password before storing in a database
+
+        Args:
+
+            password: This should be a string 
+        """
         password = str(password)
         salt = bcrypt.gensalt()
         hashed = bcrypt.hashpw(password.encode(), salt)
         return hashed.decode('utf-8')
 
     def verify_password(self,enter_password, stored_password):
+        """
+        An internal function used to compare a hashed password to a new password
+
+        Args:
+
+            enter_password (str): The password that you are trying to compare, unhashed, should be a string
+            stored_password (bytes): a hashed password that is being compared to, should already be hashed
+        """
         if isinstance(stored_password,str):
             stored_password = stored_password.encode('utf-8')
         return bcrypt.checkpw(enter_password.encode(),stored_password)
     
-    def generate_token(self,username,role):
+    def generate_token(self,username,role,extend=(24 * 3600)):
+        """Generates a Token which has the Username, Role, Permission, Session (in that order)
+        
+        Args:
+            username (str): the username of the user
+            role (str): his assigned role typically stored at position [2] when stored in the database
+        
+        Notes:
+
+            Session is in the format of Unix UTC
+        """
         defined_permissions = load_json(PERMISSION_FILE)
         permission = defined_permissions[role]
         payload = {
             "Username":username,
             "Role":role,
             "Permission": permission,
-            "Session": int(time.time()) + (24 * 3600)
+            "Session": int(time.time()) + extend
         }
         token = jwt.encode(payload,SECRET_KEY,algorithm="HS256")
         return token
    
-    def login(self,username,password):
+    def login(self,username,password,extend=(24 * 3600)):
+        """Logs in a user with username and password.
+
+        Args:
+            username (str): The username of the user.
+            password (str): The password of the user.
+
+        Returns:
+            dict: A dictionary with 'state' (bool) and either 'token' or 'message'.
+        """
         with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
     
@@ -84,8 +137,7 @@ class Authentication():
             stored_password = data[1]
             if self.verify_password(password,stored_password):
                 general_logger.info("Login Successful")
-                role = data[2]
-                token = self.generate_token(data[0],role)
+                token = self.generate_token(data[0],data[2],extend)
                 return {"state":True,"token":token}
             else:
                 general_logger.critical("Incorrect Username or Password!")
@@ -94,7 +146,16 @@ class Authentication():
                 else:
                     return {"state":False,"message":"Incorrect Username or Password!"}
         
-    def register(self,name,password):
+    def register(self,name,password,role="User"):
+        """Registers a new user.
+
+        Args:
+            name (str): The username for the new user.
+            password (str): The password for the new user.
+
+        Returns:
+            dict: A dictionary with 'state' (bool) and 'Token' or 'message'.
+        """
         with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor  = conn.cursor()
             
@@ -109,13 +170,22 @@ class Authentication():
             
             hashing_password = self.hashed_password(password)
             general_logger.info("Successfully Registered")
-            cursor.execute("INSERT INTO data (username,password,role) VALUES (%s,%s,%s)",(name,hashing_password,"User"))
+            cursor.execute("INSERT INTO data (username,password,role) VALUES (%s,%s,%s)",(name,hashing_password,role))
             conn.commit()
 
-            token = self.generate_token(name,"User")
+            token = self.generate_token(name,role)
             return {"state":True,"Token":token}
 
     def reset_password(self,username,new_password):
+        """Resets the password for a user.
+
+        Args:
+            username (str): The username of the user.
+            new_password (str): The new password.
+
+        Returns:
+            dict: A dictionary with 'state' (bool) and 'message'.
+        """
         with closing(connect_db(self.credentials[0],self.credentials[1],self.credentials[2],self.credentials[3],self.credentials[4])) as conn:
             cursor = conn.cursor()
 
@@ -144,13 +214,23 @@ class Authentication():
             general_logger.info("Password Reset Successful")
             conn.commit()
             
-            return {"state":True,"message":"Resset Password Successful"}
+            return {"state":True,"message":"Reset Password Successful"}
 
 class Action(Authentication):
     def __init__(self,enable_logging=False,dev_mode=False,):
         super().__init__(enable_logging,dev_mode)
         
     def add_role(self,new_role, permissions,token = None):
+        """Adds a new role with permissions.
+
+        Args:
+            new_role (str): The name of the new role.
+            permissions (str): The permissions for the role.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict: A dictionary with 'state' (bool) and 'message'.
+        """
         if self.dev_mode == False:
             perm = "add_role"
             if not self.verifypermissions(perm,token):
@@ -165,7 +245,7 @@ class Action(Authentication):
                 defined_permissions[new_role] = [permissions if permissions else []]
             general_logger.info(f"Added Role: {new_role}")
             Action.save_json(PERMISSION_FILE,defined_permissions)
-            return True
+            return {"state":True,"message":f"Added Role: {new_role}"}
         elif self.dev_mode == True:
             general_logger.warning("Role Already Exists")
             raise AlreadyExist(f"{new_role} Already Exist")
@@ -174,6 +254,15 @@ class Action(Authentication):
             return {"state":False,"message":"Role Already Exist"}
        
     def remove_role(self,role_to_remove,token=None):
+        """Removes a role.
+
+        Args:
+            role_to_remove (str): The role to remove.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict: A dictionary with 'state' (bool) and 'message'.
+        """
         defined_permissions = load_json(PERMISSION_FILE)    
 
         if self.dev_mode == False:
@@ -185,7 +274,7 @@ class Action(Authentication):
             defined_permissions.pop(role_to_remove)
             general_logger.info(f"Removed Role: {role_to_remove}")
             Action.save_json(PERMISSION_FILE,defined_permissions)
-            return True
+            return {"state":True,"message":f"Removed Role: {role_to_remove}"}
         elif self.dev_mode == True:
             general_logger.info(f"No Role Called: {role_to_remove}")
             raise UsernameNotFound(f"No Role Called {role_to_remove}")
@@ -194,6 +283,17 @@ class Action(Authentication):
             return {"state":False,"message":f"No Role Called {role_to_remove}"}
       
     def add_user(self,username,password,role="User",token=None):
+        """Adds a new user.
+
+        Args:
+            username (str): The username.
+            password (str): The password.
+            role (str): The role, default 'User'.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict: A dictionary with 'state' and 'message'.
+        """
         
         if not self.dev_mode:
             perm = "add_user"
@@ -218,6 +318,17 @@ class Action(Authentication):
             return {"state":True,"message":f"Successfully added {username}"}
         
     def add_bulk_user(self,username=[],password=[],role="User",token=None):
+        """Adds multiple users in bulk.
+
+        Args:
+            username (list): List of usernames.
+            password (list): List of passwords.
+            role (str): The role for all users, default 'User'.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict: A dictionary with 'state' and 'message'.
+        """
         if not self.dev_mode:
             perm = "add_user"
             if not self.verifypermissions(perm,token):
@@ -247,6 +358,15 @@ class Action(Authentication):
 
 
     def remove_user(self,remove_ans,token=None):
+        """Removes a user.
+
+        Args:
+            remove_ans (str): The username to remove.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict: A dictionary with 'state' and 'message'.
+        """
         if self.dev_mode == False:
             perm = "remove_user"
             if not self.verifypermissions(perm,token):
@@ -271,10 +391,25 @@ class Action(Authentication):
                 
     @staticmethod
     def save_json(filepath,data):
+        """Internal function that saves data to a JSON file.
+
+        Args:
+            filepath (str): The path to the file.
+            data (dict): The data to save.
+        """
         with open(filepath, 'w') as f:
             json.dump(data,f, indent=4)
     
-    def view_userinfo(self,toview,token=None):
+    def view_user_info(self,toview,token=None):
+        """Views user information.
+
+        Args:
+            toview (str): The username to view, or 'all'.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            dict or list: User info or list of users.
+        """
         name = {"Username":"admin"}
         if self.dev_mode ==  False:
             name = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
@@ -310,6 +445,15 @@ class Action(Authentication):
                 return allusers             
         
     def verifypermissions(self, perm, token=None):
+        """Verifies if a permission is granted.
+
+        Args:
+            perm (str): The permission to check.
+            token (bytes): Token must be passed in production mode 
+
+        Returns:
+            bool: True if permitted.
+        """
         try:
             decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             allowed_permissions = decoded["Permission"]
@@ -329,9 +473,21 @@ class Action(Authentication):
         
     @staticmethod
     def require_permission(role):
+        """Decorator to require a specific role.
+
+        Args:
+            role (str): The required role.
+
+        Returns:
+            function: The decorated function.
+        """
         def wrapper(func):
+            @wraps(func)
             def inner(*args, **kwargs):
-                token = kwargs.get("token") or args[0] # depends on how you pass it
+                from flask import request
+                token = request.cookies.get("access_token")
+                if not token:
+                    raise(PermissionDenied("Token Does Not Exist"))
                 decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
 
                 if role != decoded.get("Role"):

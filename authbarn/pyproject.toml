@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "authbarn"
+version = "0.1.0"
+description = "A Python authentication library with role-based permissions and MySQL backend"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.6"
+authors = [
+    {name = "Barndalion", email = "your-email@example.com"},  # Replace with actual
+]
+maintainers = [
+    {name = "Barndalion", email = "your-email@example.com"},
+]
+keywords = ["authentication", "authorization", "mysql", "jwt", "permissions"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "bcrypt>=4.0.0",
+    "PyJWT>=2.0.0",
+    "python-dotenv>=0.19.0",
+    "mysql-connector-python>=8.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/authbarn"  # Replace
+Documentation = "https://github.com/yourusername/authbarn#readme"
+Repository = "https://github.com/yourusername/authbarn.git"
+Issues = "https://github.com/yourusername/authbarn/issues"
+Changelog = "https://github.com/yourusername/authbarn/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["authbarn"]  # Assuming we rename the folder
+
+[tool.setuptools.package-dir]
+"" = "src"  # We need to move code to src/authbarn/</content>
+<parameter name="filePath">c:\Users\darel\OneDrive - voorhees.edu\Desktop\git_authbarn\AUTHBARN\pyproject.toml

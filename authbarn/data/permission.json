@@ -4,12 +4,7 @@
         "remove_role",
         "add_user",
         "view_userinfo",
-        "add_user",
-        "custom_permission",
-        "bind",
-        "execute",
-        "print_name",
-        "printing"
+        "add_user"
     ],
-    "User": ["Prinny"]
+    "User": []
 }
